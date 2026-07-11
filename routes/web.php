@@ -27,8 +27,13 @@ use Illuminate\Support\Facades\Http;
 |Sme
 */
 Route::get('clear', function() {
+    abort_unless(app()->environment('local'), 404);
     Artisan::call('optimize:clear');
     return back();
+});
+
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok']);
 });
 
 // GAMES PROVIDER
