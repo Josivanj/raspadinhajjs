@@ -1,0 +1,16 @@
+JOGUE A IMAGEM transferir NA PASTA STORAGE
+PUBLIC/STORAGE
+
+BASTA JOGAR A transferir NESSA PASTA
+
+admin
+
+/stv
+
+qic@gmail.com
+123123123
+
+
+2FA
+
+123456  TROCA NO ENV

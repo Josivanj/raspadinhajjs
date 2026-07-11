@@ -1,0 +1,52 @@
+PASSOS PARA SUBIR O SITE
+
+1. Envie todos os arquivos desta pasta para a hospedagem.
+   O projeto ja tem .htaccess na raiz redirecionando para a pasta public.
+   No InfinityFree, envie os arquivos pelo botao File Manager da conta.
+   Pacote criado para envio: site-infinityfree-pronto-lite-20260710-175922.zip
+   Se o File Manager recusar pelo tamanho, use FTP Details e envie por FileZilla.
+
+2. Importe o banco:
+   - Use raspoupixbr2020.sql no phpMyAdmin ou painel da hospedagem.
+   - Banco ja importado em if0_42374754_raspadinha.
+
+3. Ajuste o arquivo .env:
+   - APP_URL=http://primiada.kesug.com
+   - DB_HOST=sql305.infinityfree.com
+   - DB_PORT=3306
+   - DB_DATABASE=if0_42374754_raspadinha
+   - DB_USERNAME=if0_42374754
+   - DB_PASSWORD=a1LsmqW5OSAHza
+   - APP_ENV=production
+   - APP_DEBUG=false
+   - BROADCAST_DRIVER=log
+   - MAIL_MAILER=log
+   - STRIPE_ENABLED=off
+   - STRIPE_SUBSCRIPTION_ENABLED=off
+
+   Importante:
+   No InfinityFree, nao deixe PUSHER_HOST=credkbet.local e nao deixe SMTP antigo.
+   Isso pode causar erro 500.
+
+4. Permissoes de pasta:
+   - storage precisa permitir escrita.
+   - bootstrap/cache precisa permitir escrita.
+   - Se o site abrir estranho depois de trocar o .env, acesse /clear uma vez.
+   - Se aparecer erro 500, confira storage/logs/laravel.log.
+   - Nao use .user.ini com open_basedir de outro dominio/servidor.
+
+5. Admin:
+   - Email: jjfelix2003@gmail.com
+   - Senha: andrademd
+   - Senha 2FA: andrademd
+   - Painel: /central-premiada
+   - Link final: http://primiada.kesug.com/central-premiada
+
+6. Observacao importante:
+   O Laravel foi ajustado para garantir esse admin automaticamente quando o site abrir,
+   desde que as tabelas users, roles, model_has_roles e wallets ja existam no banco.
+
+7. Hospedagem recomendada:
+   - Voce esta usando InfinityFree com o dominio gratis primiada.kesug.com.
+   - No painel, use MySQL Databases para criar o banco e pegar os dados do .env.
+   - Depois use File Manager para enviar os arquivos e phpMyAdmin para importar raspoupixbr2020.sql.

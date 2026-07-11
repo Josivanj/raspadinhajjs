@@ -1,0 +1,3157 @@
+var config = require('./config');
+var fs = require('fs');
+var html = '<!DOCTYPE html><html><head></head><body> </body></html>';
+let https = require('https');
+
+var options = {
+  key: fs.readFileSync('ssl/privkey.pem'),
+  cert: fs.readFileSync('ssl/cert.pem')
+};
+
+const express = require('express')
+const app = express()
+
+var server = https.createServer(options, app, function (request, response) {  
+  response.writeHeader(200, {"Content-Type": "text/html"});  
+  response.write(html);  
+  response.end();  
+});
+
+var nodemailer = require('nodemailer');
+var transporter = nodemailer.createTransport({
+    host: 'smtp.hostinger.com',
+    port: 587,
+    secure: false, // use SSL
+    auth: {
+        user: 'suporte@beyondoficial.com',
+        pass: 'Beyond_123qwe'
+    }
+});
+
+let doubleBetsClose = false;
+
+const process = require('process');
+
+process.on('uncaughtException', function (error) {
+  console.log(error);
+});
+
+app.use(function (req, res, next) {
+
+    // Website you wish to allow to connect
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // Request methods you wish to allow
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+
+    // Request headers you wish to allow
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+
+    // Set to true if you need the website to include cookies in the requests sent
+    // to the API (e.g. in case you use sessions)
+    res.setHeader('Access-Control-Allow-Credentials', true);
+
+    // Pass to next layer of middleware
+    next();
+});
+
+var io = require('socket.io')(server, {
+  cors: {
+    origin: '*',
+  }
+});
+var onlineFake = 26;
+var crypto = require('crypto');
+var request = require('request');
+var mysql      = require('mysql');
+const { exec } = require('child_process');
+var sha256 = require('sha256');
+var math = require('mathjs');
+var randomstring = require("randomstring");
+var connection = mysql.createConnection({
+  host     : config.host,
+  user     : config.user,
+  password : config.password,
+  database : config.db
+}); //SITE init end
+
+//TOWER
+let towerLastId = 0;
+let towerGames = [];
+
+var multer = require('multer');
+const { db } = require('./config');
+var upload = multer();
+
+// for parsing application/json
+app.use(express.json()); 
+
+// for parsing application/x-www-form-urlencoded
+app.use(express.urlencoded({ extended: true })); 
+
+// for parsing multipart/form-data
+app.use(upload.array()); 
+app.use(express.static('public'));
+
+/* Parte alterada */
+let depositsPaid = [];
+/* Fim Parte alterada */
+
+app.post('/payment', (req, res) => {
+  try {
+    let response = req.body
+
+    if (response && (response.data === undefined)) {
+      return res.send('failed')
+    }
+
+    let data = response.data;
+
+    /* Parte alterada */
+    if(depositsPaid.includes(data.id)) return res.send('failed');
+    /* Fim Parte alterada */
+
+    if ((data.event !== 'invoice.status_changed') && (data.status !== 'paid')) {
+      return res.send('paid')
+    }
+
+    if (data.status === 'paid') {
+      connection.query('SELECT * FROM `payment_history` WHERE `offer_id`=' + connection.escape(data.id) + ' LIMIT 1', function (err, rows) {
+        connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(rows[0].email), function (err, usrs) {
+          if (rows.length > 0) {
+            if (rows[0].credited != 0) return;
+            /*
+            if(usrs[0].wallet < 1) {
+              connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + (parseFloat(rows[0].worth) + parseFloat(rows[0].bonus)) + ', `bonus` = ' + connection.escape(parseFloat(rows[0].bonus)) + ', `last_deposit` = ' + connection.escape(rows[0].worth) + ' WHERE `username` = ' + connection.escape(rows[0].user));
+            } else {
+              connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + (parseFloat(rows[0].worth) + parseFloat(rows[0].bonus)) + ', `bonus` = `bonus` + ' + connection.escape(parseFloat(rows[0].bonus)) + ', `last_deposit` = ' + connection.escape(rows[0].worth) + ' WHERE `username` = ' + connection.escape(rows[0].user));
+            }
+            */
+
+            connection.query('UPDATE `payment_history` SET `offer_state` = ' + connection.escape('paid') + ' WHERE `offer_id` = ' + connection.escape(data.id), function (err, row) {
+
+              connection.query('UPDATE `payment_history` SET `credited` = 1 WHERE `offer_id` = ' + connection.escape(data.id));
+              
+              /* Parte alterada */
+              if(depositsPaid.includes(data.id)) return;
+              depositsPaid.push(data.id);
+              /* Fim Parte alterada */
+
+              if(rows[0].bonus && rows[0].worth >= 50 && usrs[0].inviter == 'campanhagoogle@gmail.com') {
+                connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + parseFloat(rows[0].worth) + ', `wallet_bonus` = `wallet_bonus` + ' + (parseFloat(rows[0].worth) * 2) + ', `bonus` = ' + (parseFloat(rows[0].worth) * 2) + ', `deposit_sum` = `deposit_sum` + ' + parseFloat(rows[0].worth) + ', `deposit_sum_code` = `deposit_sum_code` + ' + parseFloat(rows[0].worth) + ', `last_deposit` = ' + (parseFloat(rows[0].worth)) + ' WHERE `email` = ' + connection.escape(rows[0].user));
+              } else if(rows[0].bonus && rows[0].worth >= 50 && usrs[0].inviter == 'campanhafacebook@gmail.com') {
+                connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + parseFloat(rows[0].worth) + ', `wallet_bonus` = `wallet_bonus` + ' + (parseFloat(rows[0].worth) * 2) + ', `bonus` = ' + (parseFloat(rows[0].worth) * 2) + ', `deposit_sum` = `deposit_sum` + ' + parseFloat(rows[0].worth) + ', `deposit_sum_code` = `deposit_sum_code` + ' + parseFloat(rows[0].worth) + ', `last_deposit` = ' + (parseFloat(rows[0].worth)) + ' WHERE `email` = ' + connection.escape(rows[0].user));
+              } else if(rows[0].bonus && rows[0].worth >= 50 && usrs[0].inviter == 'promorhaedercurso@promo.com') {
+                connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + parseFloat(rows[0].worth) + ', `wallet_bonus` = `wallet_bonus` + ' + (parseFloat(rows[0].worth) * 2) + ', `bonus` = ' + (parseFloat(rows[0].worth) * 2) + ', `deposit_sum` = `deposit_sum` + ' + parseFloat(rows[0].worth) + ', `deposit_sum_code` = `deposit_sum_code` + ' + parseFloat(rows[0].worth) + ', `last_deposit` = ' + (parseFloat(rows[0].worth)) + ' WHERE `email` = ' + connection.escape(rows[0].user));
+              } else if(rows[0].bonus && rows[0].worth >= 50 && usrs[0].inviter == 'porncampaing@porncampaign.com') {
+                connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + parseFloat(rows[0].worth) + ', `wallet_bonus` = `wallet_bonus` + ' + (parseFloat(rows[0].worth) * 2) + ', `bonus` = ' + (parseFloat(rows[0].worth) * 2) + ', `deposit_sum` = `deposit_sum` + ' + parseFloat(rows[0].worth) + ', `deposit_sum_code` = `deposit_sum_code` + ' + parseFloat(rows[0].worth) + ', `last_deposit` = ' + (parseFloat(rows[0].worth)) + ' WHERE `email` = ' + connection.escape(rows[0].user));
+              } else if(rows[0].bonus && rows[0].worth >= 50 && usrs[0].inviter == 'googlecampaign@googlecampaign.com') {
+                connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + parseFloat(rows[0].worth) + ', `wallet_bonus` = `wallet_bonus` + ' + (parseFloat(rows[0].worth) * 2) + ', `bonus` = ' + (parseFloat(rows[0].worth) * 2) + ', `deposit_sum` = `deposit_sum` + ' + parseFloat(rows[0].worth) + ', `deposit_sum_code` = `deposit_sum_code` + ' + parseFloat(rows[0].worth) + ', `last_deposit` = ' + (parseFloat(rows[0].worth)) + ' WHERE `email` = ' + connection.escape(rows[0].user));
+              } else {
+                connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + parseFloat(rows[0].worth) + ', `deposit_sum` = `deposit_sum` + ' + parseFloat(rows[0].worth) + ', `deposit_sum_code` = `deposit_sum_code` + ' + parseFloat(rows[0].worth) + ', `last_deposit` = ' + (parseFloat(rows[0].worth)) + ' WHERE `email` = ' + connection.escape(rows[0].user));
+              }
+
+              connection.query('SELECT * FROM users', function (err1, rows1) {
+                let totalwallet = 0;
+                rows1.forEach(function (usr) {
+                  if (usr.rank == 'user') {
+                    totalwallet += usr.wallet;
+                  }
+                });
+
+                connection.query('UPDATE `config` SET `banca_total_deposit` = `banca_total_deposit` + ' + (parseFloat(rows[0].worth)) + ', `banca` = ' + (parseFloat(totalwallet * 2)) + ' WHERE `id` = 1');
+              });
+            });
+          }
+        });
+      });
+    }
+
+    return res.send('success')
+  } catch (error) {
+    console.log(error)
+  }
+});
+
+app.get('/crash/history', (req, res) => {
+  res.send(cgame_history);
+});
+
+app.get('/double/history', (req, res) => {
+  res.send(lastrolls);
+});
+
+app.get('/xdouble/history', (req, res) => {
+  res.send(doubleplus.history);
+});
+
+app.get('/relatory', (req, res) => {
+  let response = req.body;
+  try {
+    let deposit_total = 0;
+    let users_wallet = 0;
+    let deposit_today = 0;
+    connection.query('SELECT * FROM `payment_history`', function (err1, deposits) {
+      if(!err1) {
+        const date = new Date();
+
+        const ano = date.getFullYear();
+        const mes = date.getMonth() + 1;
+        const dia = date.getDate();
+        deposits.forEach(function(deposit) {
+
+          if(deposit.offer_state == 'paid') {
+            deposit_total += deposit.worth;
+          }
+          let deposit_date = new Date(deposit.created_at);
+
+          if(deposit.offer_state == 'paid' && deposit_date.getFullYear() == ano && date.getMonth() + 1 == mes && date.getDate() == dia) {
+            deposit_today += deposit.worth;
+          }
+        })
+        connection.query('SELECT * FROM `users`', function (err2, usersTotal) {
+          if(!err2) {
+            let registers_today = 0;
+            let login_today = 0;
+            usersTotal.forEach(function(usr) {
+              if(usr.rank == 'user') {
+                users_wallet += usr.wallet;
+              }
+              
+              if(usr.created_at == null) return;
+              usr.created_at = toString(usr.created_at);
+              if((usr.created_at.split(' ')[0]).split('-')[0] == ano && (usr.created_at.split(' ')[0]).split('-')[1] == mes && (usr.created_at.split(' ')[0]).split('-')[2] == dia) {
+                registers_today++;
+              }
+              let lastLogin = new Date(parseInt(usr.token_time) * 1000);
+              if(lastLogin.getFullYear() == ano && (lastLogin.getMonth()+1) == mes && lastLogin.getDate() == dia) {
+                login_today++;
+              }
+            })
+            
+            let profit = (deposit_total - users_wallet);
+            res.send(`<p>Lucro total (Total de depósito - Total nas carteiras): ` + parseFloat(profit).toFixed(2) + `</p>\n
+            <p>Total em carteiras: ` + parseFloat(users_wallet).toFixed(2) + `</p>\n
+            <p>Total depositado: ` + parseFloat(deposit_total).toFixed(2) + `</p>`)
+          }
+        })
+      }
+    })
+
+  } catch(e) {
+
+  }
+  
+});
+
+//BOT init start
+//BOT init stop
+
+let crashPredict = null;
+let roulettePredict = null;
+
+//SITE SETTINGS
+var users = {};
+var chat_muted = false;
+var pause = false;
+var lastrolls = [];
+var last_message = {};
+var usersBr = {};
+var chat_history = [];
+var currentBets = {'red': [], 'green': [], 'black': []};
+var accept = 100;
+var wait = 50;
+var timer = -1;
+var currentRollid = 0;
+var winningNumber = 0; 
+var actual_hash = sha256(generate(64)+'RETARDSTRYINGFUDASDADASDASCKTHATSHIT'+sha256('ripGADASDASDMESDASDSA')+generate(2));
+
+var active = {
+  roulette: true,
+  jackpot: true,
+  coinflip: true,
+dice: true,
+mines: true,
+  crash: true,
+  withdraw: true,
+  deposit: true,
+};
+
+//COINFLIP
+var cfBets = [];
+var betUsers = {};
+
+//JACKPOT
+var jpTime = 20; //POOL TIMELEFT YOU WANT IN SECONDS
+
+var jpPool = 0;
+var jpTimeleft = -1;
+var jpAllow = true;
+var jpBets = [];
+var jpWinners = [];
+var jpUsers = {};
+
+//DICE
+var user_dice_current = {};
+var dice_games = [];
+
+//CRASH
+var cserverSeed = 'B3YnUvGqUnUWX4Ne+a@qdLvX-SR-6N$AjUh?SDADSA@#SWZB^GsN@3_pWNY7Y2+WrK92=H_UM6x=vpJ!vX9z_29MRh-c&d3Y_py4afhnWQQxuJWkHdGxrt@Z2NEX!RabHXy%L@+T7ZN#hgq5fv5s+zxaL-Nv+^Uu*V+Eq+&ApV_!3dp6bFX6%tffps^M%TE%L2=APF%5xnh$9LvMWXh9bq+$xY2VQKbRj7+nbK+YCA?wvs5nJ2*xusY4=Dyf?EGPB!TuMcjD';
+var cclientSeed = '7nb53jfbebfx4jhaxqs4hufq9jm68rz65yxDSDSDSADSw84xa33xwb7wxmersww5t6gp2xdus';
+var cstart_in = 5;
+var ccurrenthash = 'dog';
+var ccrashpoint = 0;
+var ctime = 0;
+var cgame = 0;
+var csecret = '';
+var cbets = [];
+var players_cashouts = {};
+var cgame_history = [];
+var cstatus = 'closed';
+var play_try = {};
+var startTime;
+
+let doubleplus = {
+  bets: [],
+  history: [],
+  results: [],
+  id: 0,
+  hash: '',
+  status: 1,
+  number: 1,
+  amount: 0,
+  rolling: false,
+  betting: true
+}
+
+function crashGenHash(serverSeed) {
+    return crypto.createHash('sha256').update(serverSeed).digest('hex');
+}
+
+function crashPoint(serverSeed) {
+    var hash = crypto.createHmac('sha256', serverSeed).update(cclientSeed).digest('hex');
+
+    // In 1 of 25 games the game crashes instantly.
+    if (divisible(hash, 10))
+        return 0;
+
+    // Use the most significant 52-bit from the hash to calculate the crash point
+    var h = parseInt(hash.slice(0,52/4),16);
+    var e = Math.pow(2, 52);
+
+    return Math.floor((100 * e - h) / (e - h));
+}
+
+function divisible(hash, mod) {
+    // We will read in 4 hex at a time, but the first chunk might be a bit smaller
+    // So ABCDEFGHIJ should be chunked like  AB CDEF GHIJ
+    var val = 0;
+
+    var o = hash.length % 4;
+    for (var i = o > 0 ? o - 4 : 0; i < hash.length; i += 4) {
+        val = ((val << 16) + parseInt(hash.substring(i, i+4), 16)) % mod;
+    }
+
+    return val === 0;
+}
+
+function cstart_game(){
+    csecret = crypto.randomBytes(20).toString('hex');
+    ccurrenthash = crashGenHash(ccurrenthash+csecret+cgame);
+    ccrashpoint = 0;
+    ctime = 0;
+    cstart_in = 5;
+    cbets = [];players_cashouts={};
+    cstatus = 'open';
+    io.sockets.to('crash').emit('crash info', {
+        hash: ccurrenthash,
+        players: cbets,
+        start_in: parseFloat(cstart_in)
+    });
+    var cstart_timeout = setInterval(function(){
+        cstart_in = (cstart_in - 0.01).toFixed(3);
+        if(cstart_in < 0.00){
+            clearInterval(cstart_timeout);
+            cnew_game();
+        }
+    },10);
+}
+
+/*setInterval(function() {
+  try {
+    let beforeDate = new Date();
+    beforeDate.setDate(beforeDate.getDate() - 1);
+    
+    let actualDate = new Date();
+
+    let date1 = ("0" + actualDate.getDate()).slice(-2);
+    let month1 = ("0" + (actualDate.getMonth() + 1)).slice(-2);
+    let year1 = actualDate.getFullYear();
+
+    let date2 = ("0" + beforeDate.getDate()).slice(-2);
+    let month2 = ("0" + (beforeDate.getMonth() + 1)).slice(-2);
+    let year2 = beforeDate.getFullYear();
+    
+    let payment_data = {
+      "initial_date": year1 + "-" + month1 + "-" + date1,
+      "final_date": year2 + "-" + month2 + "-" + date2,
+      "event": "invoice.status_changed"
+    }
+    request.get({
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic NUUxOTg2Qjk4RjhBOEFFQ0RFQTMyODY1MURFNzk4MkNCMjk3MTdCMzgxNTc1M0RCQzEzMUE0OEU4MDg0NUNCOQ==',
+        'Cookie': '__cfruid=ca1be8a3bc81800098d0c3711c4f38bddca4926f-1626092966'
+      },
+      url: 'https://api.iugu.com/v1/web_hooks/resend',
+      body: JSON.stringify(payment_data)
+    }, function(error, response, body){
+
+    });
+  } catch(e) {
+
+  }
+}, (1000 * 60) * 15);*/
+
+function getLevelByLevel(level) {
+  if(level == 1) return 1;
+  if(level > 1 && level <= 5) return 2;
+  if(level > 5 && level <= 9) return 3;
+  if(level > 9 && level <= 19) return 4;
+  if(level > 19 && level <= 29) return 5;
+  if(level > 29 && level <= 39) return 6;
+  if(level > 39 && level <= 49) return 7;
+  if(level > 49 && level <= 69) return 8;
+  if(level > 69 && level <= 99) return 9;
+  if(level >= 100 && level <= 149) return 10;
+  if(level >= 150) return 11;
+}
+
+function crashControl(config, users, cdrop) {
+  let banca_total = config.banca;
+  let banca_percent = config.banca_profit_percent;
+  let total = 0;
+  let minor_crash = 10;
+
+  cbets.forEach(function(cbet) {
+    if(cbet.profile.rank != 'user') return;
+    total += parseFloat(cbet.bet);
+    if(parseFloat(players_cashouts[cbet.profile.email]) < minor_crash) minor_crash = parseFloat(players_cashouts[cbet.profile.email]);
+  });
+
+  users.forEach(function(user) {
+    if(user.rank != 'user') return;
+    banca_total -= user.wallet;
+  });
+
+  if(banca_total < ((config.banca * banca_percent) / 100) && total >= 1) {
+    if(minor_crash <= 1.1) cdrop = 100;
+    if(minor_crash > 1.1 && minor_crash <= 2) cdrop = parseFloat((parseFloat(Math.random() * ((parseFloat(minor_crash) - 0.1) - 1.01) + 1.01)).toFixed(2)) * 100;
+    if(minor_crash > 2) cdrop = parseFloat((parseFloat(Math.random() * ((parseFloat(1.3) - 0.1) - 1.01) + 1.01)).toFixed(2)) * 100; 
+    return cdrop
+  }
+
+  return cdrop;
+
+}
+
+function cnew_game() {
+  connection.query('SELECT * FROM `config` WHERE `id` = 1', function(errs, configs) {
+    connection.query('SELECT * FROM `users` WHERE `rank` = "user"', function(errs, bets) {
+      cbets.forEach(function(bet) {
+        connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(bet.profile.email) + ' LIMIT 1', function (err, row) {
+          if (!err) {
+            if(row[0].last_deposit > 0 && row[0].wallet == 0) {
+              let referrer_email = row[0].inviter;
+              connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(row[0].inviter) + ' LIMIT 1', function (err, inviter) {
+                if(!err && inviter.length > 0) {
+                  let reward = (inviter[0].referPercent / 100) * (parseFloat(row[0].last_deposit));
+                  connection.query('UPDATE `users` SET `referRewards` = `referRewards` + ' + parseFloat(reward) + ' WHERE `email` = ' + connection.escape(referrer_email));
+                  connection.query('UPDATE `users` SET `last_deposit` = 0 WHERE `email` = ' + connection.escape(bet.profile.email));
+                }
+              });
+            }
+          }
+        });
+      });
+      cgame++;
+      cstatus = 'closed';
+      var cdrop = crashPoint(ccurrenthash);
+      startTime = new Date(Date.now() + 5000);
+      io.sockets.to('crash').emit('crash start', {
+          multiplier: 1,
+          time: 0,
+      });
+
+      cdrop = crashControl(configs[0], bets, cdrop);
+      if (crashPredict != null) {
+        cdrop = parseInt(crashPredict * 100);
+        crashPredict = null;
+      }
+      console.log("[CRASH] "+cgame+": "+(cdrop / 100)+""+" (DEBUG: "+cdrop+")");
+      var cgame_timeout = setInterval(function(){
+
+          ctime+=2;
+          ccrashpoint = Math.floor(100 * growthFunc(ctime));
+          doCashouts(ccrashpoint/100);
+             if(ccrashpoint >= cdrop){
+              cbets.forEach(function (play) {
+                if ((!players_cashouts[play.profile.email])) return;
+                if(players_cashouts[play.profile.email] >= 2) {
+                  let bonus = parseFloat(play.bet / 35);
+                  bonus = bonus.toFixed(2);
+
+                  connection.query('SELECT * FROM `users` WHERE `email` = '+connection.escape(play.profile.email), function(err, row) {
+                    if(row[0].rank != 'bot')
+                    {
+
+                      let levelUpXp = 8000 + (600 * (row[0].level+1));
+                      let newXP = (row[0].xp + (parseFloat(play.bet)*10));
+                      if(newXP >= levelUpXp) {
+                        connection.query('UPDATE `users` SET `xp` = '+ parseFloat(newXP - levelUpXp) +', `level` = `level` + 1 WHERE `email` = '+connection.escape(play.profile.email));
+                      } else {
+                        connection.query('UPDATE `users` SET `xp` = `xp` + '+ parseFloat((parseFloat(play.bet)*10)) +' WHERE `email` = '+connection.escape(play.profile.email));
+                      }
+                    }
+                  });
+                }
+              });
+
+              cstatus = 'drop';
+              clearInterval(cgame_timeout);
+              clearInterval(cshowgame_timeout);
+              cmultiplier = growthFunc(ctime);
+              io.sockets.to('crash').emit('crash end', {
+                  bet: 0,
+                  hash: ccurrenthash,
+                  multiplier: cmultiplier,
+                  profit: 0,
+                  secret: csecret
+              });
+              crash_limit({
+                  bet: 0,
+                  hash: ccurrenthash,
+                  multiplier: cmultiplier,
+                  profit: 0,
+                  secret: csecret,
+                  time: new Date().getTime()
+              });
+              setTimeout(function(){
+                  cstart_game();
+              },5000);
+          }
+      });
+      var cshowgame_timeout = setInterval(function(){
+          io.sockets.to('crash').emit('crash tick', {
+              time: ctime,
+              multiplier: growthFunc(ctime)
+          });
+      },30);
+    });
+  });
+}
+
+function crash_limit(wartosc){
+  if(cgame_history.length==15){
+    cgame_history.shift();
+  }
+  cgame_history.push(wartosc);
+}
+
+function growthFunc(ms) {
+    var r = 0.00006;
+    return Math.pow(Math.E, r * ms);
+}
+
+function doCashouts(at) {
+    cbets.forEach(function (play) {
+        if ((play.done) || (!players_cashouts[play.profile.email])) return;
+        if (players_cashouts[play.profile.email] <= at && players_cashouts[play.profile.email] <= growthFunc(ctime)) {
+            crashWithdraw(play.profile);
+        }
+    });
+}
+
+cstart_game();
+
+connection.connect(); //db connect
+
+/*                                                                                                                                                              */
+/*                                                                                SITE PART                                                                     */
+/*                                                                                                                                                              */
+
+load();
+checkTimer();
+io.on('connection', function (socket) {
+  var user = false;
+  socket.on('init', function (init) {
+    if (!init) return;
+    if (init.game === 'roulette') socket.join('roulette');
+    if (init.game === 'roulette') socket.emit('roulette round', timer/10, currentBets, actual_hash, pause ? winningNumber : null);
+    if (init.game === 'roulette') socket.emit('roulette history', lastrolls);
+    if (init.game == 'doubleplus') socket.emit('doubleplus numbers', doubleplus);
+    if (init.game == 'doubleplus') socket.join('doubleplus');
+    if (init.game === 'coinflip') socket.join('coinflip');
+    if (init.game === 'coinflip') socket.emit('coinflip history', cfBets);
+    if (init.game === 'jackpot') socket.join('jackpot');
+    if (init.game === 'jackpot') socket.emit('jackpot round', jpTimeleft, jpBets, jpWinners);
+    if (init.game === 'dice') socket.join('dice');
+		if (init.game === 'dice') socket.emit('dice-history', dice_games.filter(function(game){return game.user != null;}))
+    if (init.game === 'crash') socket.join('crash');
+    if(init.game === 'crash') socket.emit('crash history', cgame_history);
+    if(init.game === 'crash') socket.emit('crash settings', {
+        maxBet: 1000,
+        minBet: 1
+    });
+    if(init.game === 'crash' && init.logged) {
+      var find = cbets.find(x => x.profile.email == init.email);
+      if(find){
+        socket.emit('crash my bet',parseFloat(find.bet));
+      }
+    }
+	
+	  var online = Object.keys(users).length;
+    socket.emit('users online', online + onlineFake);
+    socket.emit('chat', chat_history);
+    if(init.logged){
+      connection.query('SELECT * FROM `users` WHERE `email`='+connection.escape(init.email)+' AND `token_time`='+connection.escape(init.time)+' AND `token`='+connection.escape(init.token)+' LIMIT 1', function(err, rows) {
+      if((err) || (!rows.length)) {
+        socket.disconnect();
+        console.log('auth failed.');
+        return;
+      }
+      else if(rows) {
+        if (init.game === 'dice') socket.emit('dice-hash', {
+          "hash": generateDiceGame(init.email)
+        });
+        if(rows[0].logged_in) return;
+        if(rows[0].banned) return;
+        connection.query('UPDATE `users` SET `logged_in` = 1 WHERE `email`='+connection.escape(init.email)+' AND `token_time`='+connection.escape(init.time)+' AND `token`='+connection.escape(init.token)+' LIMIT 1', function(err1, rows1) {
+          if(err1) return;
+          user = rows[0];
+          if(!users[rows[0].email]) {
+            users[rows[0].email] = {
+              socket: [],
+			  email: rows[0].email
+            }
+          }
+          users[rows[0].email]['socket'].push(socket.id);
+        });
+      } else {
+        return;
+      }
+    });
+    }
+  });
+  socket.on('disconnect', function() {
+    var index = -1;
+    if(users[user.email])
+    index = users[user.email]['socket'].indexOf(socket.id);
+    if (index > -1) {
+        users[user.email]['socket'].splice(index, 1);
+    }
+    if(users[user.email]) { if(Object.keys(users[user.email]['socket']).length == 0) delete users[user.email]; }
+  });
+  socket.on('update ref', function(code) {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+	var code123 = randomstring.generate({
+  length: 7,
+  charset: 'alphabetic',
+  capitalization: 'uppercase'
+});
+      connection.query('SELECT `code` FROM `users` WHERE `code` = \''+code123+'\' LIMIT 1', function(codes_error, codes){
+        if(codes_error){
+          socket.emit('notify','error','updateRefFail');
+        } else {
+          if(codes.length > 0){
+            socket.emit('notify','error','updateRefAlreadyTaken');
+          } else {
+            connection.query('UPDATE `users` SET `code` = \''+code123+'\' WHERE `email` = '+connection.escape(user.email), function(codes_update_error){
+              if(codes_update_error){
+                console.log(codes_update_error);
+                return socket.emit('notify','error','updateRefFail');
+              } else {
+                socket.emit('notify','success','updateRefSuccess');
+              }
+            });
+          }
+        }
+      });
+  });
+
+  socket.on('register user', function (details) {
+    if(details.username == null || details.username == undefined || 
+      details.email == null || details.email == undefined ||
+      details.name == null || details.name == undefined ||
+      details.last_name == null || details.last_name == undefined ||
+      details.cpf == null || details.cpf == undefined ||
+      details.phone == null || details.phone == undefined 
+    ) return socket.emit('notify','error','Dados incorretos ou vazios, preencha todos e tente novamente.');
+    connection.query('SELECT * FROM `users` WHERE `username` = ' + connection.escape(details.username) + ' LIMIT 1', function (err, row) {
+      if (row.length == 0) {
+        connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(details.email) + ' LIMIT 1', function (err, row1) {
+          if(row1.length == 0) {
+            connection.query('SELECT * FROM `users` WHERE `cpf` = ' + connection.escape(details.cpf) + ' LIMIT 1', function (err, row2) {
+              if (row2.length == 0) {
+                socket.emit('register success', details);
+              } else {
+                socket.emit('notify','error','Esse CPF já foi cadastrado na plataforma.');
+              }
+            });
+          } else {
+            socket.emit('notify','error','Esse email já foi cadastrado na plataforma.');
+          }
+        });
+      } else {
+        socket.emit('notify','error','Esse username já foi cadastrado na plataforma.');
+      }
+    });
+  });
+
+  /*socket.on('remove bonus', function () {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(user.email) + ' LIMIT 1', function (err, row) {
+      if (row.length > 0) {
+        if(row[0].bonus > 0) {
+          connection.query('SELECT * FROM `payment_history` WHERE `user` = ' + connection.escape(row[0].username), function (err1, deposits) {
+            let wallet = row[0].wallet;
+            if(wallet - deposits[deposits.length-1].worth <= 0) {
+              connection.query('UPDATE `users` SET `wallet` = 0, `bonus` = 0 WHERE `username` = ' + connection.escape(row[0].username));
+              
+              if(users[user.email])
+              users[user.email].socket.forEach(function(asocket) {
+                if(io.sockets.connected[asocket]) {
+                  io.sockets.connected[asocket].emit('notify','success','Bônus removido com sucesso.');
+                  io.sockets.connected[asocket].emit('balance change', parseInt(0));
+                }
+              });
+            } else {
+              connection.query('UPDATE `users` SET `wallet` = ' + parseFloat(wallet - deposits[deposits.length-1].worth) + ', `bonus` = 0 WHERE `username` = ' + connection.escape(row[0].username));
+              
+              if(users[user.email])
+              users[user.email].socket.forEach(function(asocket) {
+                if(io.sockets.connected[asocket]) {
+                  io.sockets.connected[asocket].emit('notify','success','Bônus removido com sucesso.');
+                  io.sockets.connected[asocket].emit('balance change', parseFloat(wallet - deposits[deposits.length-1].worth));
+                }
+              });
+            }
+
+          });
+        } else {
+          if(users[user.email])
+          users[user.email].socket.forEach(function(asocket) {
+            if(io.sockets.connected[asocket]) {
+              io.sockets.connected[asocket].emit('notify','error','Você não tem nenhum bônus ativo.');
+            }
+          });
+        }
+      }
+    });
+  });*/
+
+  socket.on('admin get users', function (details) {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    if(user.rank == 'siteAdmin') {
+      if(details.next != 0 && details.search == null) {
+        connection.query('SELECT * FROM `users` WHERE `id` BETWEEN '+ parseInt(((25 * details.next) - 25)+1) +' AND ' + (25 * details.next), function (err, row) {
+          console.log(err, row)
+          if (!err && row.length > 0) {
+            socket.emit('admin users', row);
+          } else {
+            console.log('tem nada')
+          }
+        });
+      } else {
+        connection.query("SELECT * FROM `users` WHERE email LIKE '%" + details.search + "%' OR username LIKE '%" + details.search + "%' LIMIT 100", function (err, row) {
+          console.log(err, row)
+          if (!err && row.length > 0) {
+            socket.emit('admin users', row);
+          } else {
+            console.log('tem nada')
+          }
+        });
+      }
+    } else {
+
+    }
+  });
+  
+  socket.on('admin get settings', function() {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    if(user.rank == 'siteAdmin') {
+      let deposit_today = 0;
+      let deposit_total = 0;
+      let users_wallet = 0;
+      connection.query('SELECT * FROM `config` WHERE `id` = 1', function (err, row) {
+        if (!err && row.length > 0) {
+          connection.query('SELECT * FROM `payment_history`', function (err1, deposits) {
+            if(!err1) {
+              const date = new Date();
+
+              const ano = date.getFullYear();
+              const mes = date.getMonth() + 1;
+              const dia = date.getDate();
+              deposits.forEach(function(deposit) {
+
+                if(deposit.offer_state == 'paid') {
+                  deposit_total += deposit.worth;
+                }
+                let deposit_date = new Date(deposit.created_at);
+
+                if(deposit.offer_state == 'paid' && deposit_date.getFullYear() == ano && date.getMonth() + 1 == mes && date.getDate() == dia) {
+                  deposit_today += deposit.worth;
+                }
+              })
+              connection.query('SELECT * FROM `users`', function (err2, usersTotal) {
+                if(!err2) {
+                  let registers_today = 0;
+                  let login_today = 0;
+                  usersTotal.forEach(function(usr) {
+                    if(usr.rank == 'user') {
+                      users_wallet += usr.wallet;
+                    }
+                    
+                    if(usr.created_at == null) return;
+                    usr.created_at = toString(usr.created_at);
+                    if((usr.created_at.split(' ')[0]).split('-')[0] == ano && (usr.created_at.split(' ')[0]).split('-')[1] == mes && (usr.created_at.split(' ')[0]).split('-')[2] == dia) {
+                      registers_today++;
+                    }
+                    let lastLogin = new Date(parseInt(usr.token_time) * 1000);
+                    if(lastLogin.getFullYear() == ano && (lastLogin.getMonth()+1) == mes && lastLogin.getDate() == dia) {
+                      login_today++;
+                    }
+                  })
+                  
+                  let profit = (deposit_total - users_wallet);
+                  let profit_today = profit - (((deposit_total - deposit_today) - users_wallet));
+                  socket.emit('admin settings', {option: row[0], deposit_today: deposit_today , deposit_total: deposit_total, profit: profit, profit_today: profit_today, users_now: Object.keys(users).length, registers_today: registers_today, users_total: usersTotal.length, users_today: login_today});
+                }
+              })
+            }
+          })
+        } else {
+          console.log('tem nada')
+        }
+      });
+    } else {
+      console.log('n é admin')
+    }
+  });
+  socket.on('admin get withdraws', function (details) {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    if(user.rank == 'siteAdmin') {
+      connection.query('SELECT * FROM `withdraw` ORDER BY `status` ASC', function (err, row) {
+
+        if (!err && row.length > 0) {
+          let rows = [];
+          for(let i = parseInt((((25 * details.next)-25)+1)); i < (25*details.next); i++) {
+            rows.push(row[i]);
+          }
+          socket.emit('admin withdraws', rows);
+        } else {
+          console.log('tem nada')
+        }
+      });
+    } else {
+      console.log('n é admin')
+    }
+  });
+  socket.on('admin get deposits', function() {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    if(user.rank == 'siteAdmin') {
+      connection.query('SELECT * FROM `payment_history` ORDER BY `id` DESC', function (err, row) {
+        if (!err && row.length > 0) {
+          socket.emit('admin deposits', row);
+        } else {
+          console.log('tem nada')
+        }
+      });
+    } else {
+      console.log('n é admin')
+    }
+  });
+  socket.on('forget code', function(details) {
+    if(user) return;
+    function makeid(length) {
+      var result           = '';
+      var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      var charactersLength = characters.length;
+      for ( var i = 0; i < length; i++ ) {
+          result += characters.charAt(Math.floor(Math.random() * charactersLength));
+      }
+      return result;
+    }
+    
+    let code = makeid(10);
+
+    connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(details.email), function(err, rows) {
+      if(!err && rows.length > 0) {
+        connection.query('UPDATE `users` SET `code_forget` = ' + connection.escape(code) + ' WHERE `email` = ' + connection.escape(details.email));
+        transporter.sendMail(
+          {
+            from: "suporte@beyondoficial.com",
+            to: details.email,
+            subject: "Recuperação de Email",
+            text: `Código para recuperação: ` + code
+          },
+          (err, info) => {
+            console.log(err)
+          }
+        );
+      } else {
+        socket.emit('notify','error','Esse email não existe no nosso sistema.');
+      }
+    });
+  });
+  socket.on('change password', function(details) {
+    if(user) return;
+    connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(details.email) + ' AND `code_forget` = ' + connection.escape(details.code) + ' LIMIT 1', function (err, row) {
+      if(!err && row.length > 0) {
+        if(row[0].code_forget != null) {
+          connection.query('UPDATE `users` SET `password` = ' + connection.escape(details.password) + ' WHERE `email` = ' + connection.escape(details.email));
+          socket.emit('notify','success','Código correto, senha trocada com sucesso.');
+        } else {
+          socket.emit('notify','error','Código ou email inválido, tente novamente mais tarde.');
+        }
+      } else {
+        socket.emit('notify','error','Código ou email inválido, tente novamente mais tarde.');
+      }
+    });
+  });
+  socket.on('login user', function (details) {
+    if(user) return;
+    connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(details.email) + ' AND `password` = ' + connection.escape(details.password) + ' LIMIT 1', function (err, row) {
+      if (row.length == 1) {
+        socket.emit('login success', details);
+      } else {
+        socket.emit('notify','error','loginDetailsInvalid');
+      }
+    });
+  });
+  socket.on('admin change user', function(details) {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    if(user.rank == 'siteAdmin') {
+      connection.query('UPDATE `users` SET `email` = ' + connection.escape(details.email) + ', `wallet` = ' + connection.escape(parseFloat(details.wallet)) + ', `banned` = ' + connection.escape(parseFloat(details.ban)) + ', `rank` = ' + connection.escape(details.rank) + ', `username` = ' + connection.escape(details.username) + ' WHERE `email` = ' + connection.escape(details.email));
+      socket.emit('admin user edit success');
+    }
+  })
+
+  socket.on('admin withdraw pix', function(details) {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    if(user.rank == 'siteAdmin') {
+      console.log(details);
+      if(details.type != 'cpf' && details.type != 'cnpj' && details.type != 'phone' && details.type != 'evp' && details.type != 'email') return;
+      if(details.password != '3125125') {
+        socket.emit('notify','error','Senha de saque inválida');
+        return;
+      }
+      let keyType = details.type;
+      let key = details.pix;
+      let amount = details.amount;
+      let postData = 
+`{
+"api_token":"5E1986B98F8A8AECDEA328651DE7982CB29717B3815753DBC131A48E80845CB9",
+"transfer_type":"pix",
+"amount_cents":` + parseFloat(amount)*100 + `,
+"receiver":{
+"pix":{
+"key": "` + key + `",
+"type": "` + keyType + `"
+}
+}
+}`;
+              let date = '';
+              exec('date +"%Y-%m-%dT%H:%M:%S%:z"', function(error, stdout, stderr){ 
+    
+                date = stdout.replace('\n', '').replace(' ', ''); 
+                console.log(date)
+            
+                fs.writeFile("pixout.txt", 
+`POST|/v1/transfer_requests
+5E1986B98F8A8AECDEA328651DE7982CB29717B3815753DBC131A48E80845CB9|`+ date +`
+` + postData, function(err) {
+                    if(err) {
+                        return console.log(err);
+                    }
+                    setTimeout(function() {
+                        exec('openssl dgst -sha256 -sign private.pem -out sign.sha256 pixout.txt', function() {
+                            setTimeout(function() {
+                                exec('openssl base64 -A -in sign.sha256 -out sign.sha256.base64', function(error, stdout, stderr) {
+                                    setTimeout(function() {
+                                        fs.readFile('sign.sha256.base64', function read(err, data) {
+                                            if (err) {
+                                                throw err;
+                                            }
+                                            let signature = data;
+                                            console.log(data.toString())
+                                            request.post('https://api.iugu.com/v1/transfer_requests', {
+                                                headers: {
+                                                    'Signature': 'signature=' + signature.toString(),
+                                                    'Content-Type': 'application/json',
+                                                    'Request-Time': date,
+                                                    'Cookie': '__cfruid=c395e166771294839b3e723f2d66168fbdb418d1-1664837951'
+                                                }, body: postData
+                                            }, function (err, stat, details) {
+                                              try {
+                                                let status = JSON.parse(details)['status'];
+                                                console.log(status)
+                                                if(status == 'done') {
+                                                  socket.emit('notify','success','Saque efetuado com sucesso.');
+                                                } else {
+                                                  socket.emit('notify','error','Erro ao solicitar o saque');
+                                                }
+                                              } catch(e) {
+                                                socket.emit('notify','error','Erro ao solicitar o saque');
+                                              }
+                                            });
+                                        });
+                                    }, 200);
+                                });
+                            }, 200);
+                        });
+                    }, 200);
+                }); 
+                
+                
+            });
+    }
+  });
+
+  socket.on('admin withdraw change', function(details) {
+    try {
+      if(!user) return socket.emit('notify','error','notLoggedIn');
+      if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+      if(user.rank == 'siteAdmin') {
+        
+        connection.query('SELECT * FROM `withdraw` WHERE `id` = ' + parseInt(details.id) + ' LIMIT 1', function (err, row) {
+          if (row.length > 0) {
+            if(row[0].status == 0 && details.status == 2)  {
+              try {
+                connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + connection.escape(parseFloat(row[0].amount)) + ' WHERE `email` = ' + connection.escape(row[0].email));
+                connection.query('UPDATE `config` SET `banca` = `banca` + ' + parseFloat(row[0].amount) + ' WHERE `id` = 1');
+              } catch(e) {
+
+              }
+            } else if(row[0].status == 2 && details.status == 1)  {
+              try {
+                connection.query('UPDATE `users` SET `wallet` = `wallet` - ' + connection.escape(parseFloat(row[0].amount)) + ' WHERE `email` = ' + connection.escape(row[0].email));
+                connection.query('UPDATE `config` SET `banca` = `banca` - ' + parseFloat(row[0].amount) + ' WHERE `id` = 1');
+              } catch(e) {
+
+              }
+            }
+
+            if(details.status == 1) {
+              console.log(parseFloat(row[0].amount)*100, row[0].pix)
+              let postData = 
+`{
+"api_token":"5E1986B98F8A8AECDEA328651DE7982CB29717B3815753DBC131A48E80845CB9",
+"transfer_type":"pix",
+"amount_cents":` + parseFloat(row[0].amount)*100 + `,
+"receiver":{
+"pix":{
+"key": "` + row[0].pix + `",
+"type": "cpf"
+}
+}
+}`;
+              let date = '';
+              exec('date +"%Y-%m-%dT%H:%M:%S%:z"', function(error, stdout, stderr){ 
+    
+                date = stdout.replace('\n', '').replace(' ', ''); 
+                console.log(date)
+            
+                fs.writeFile("pixout.txt", 
+`POST|/v1/transfer_requests
+5E1986B98F8A8AECDEA328651DE7982CB29717B3815753DBC131A48E80845CB9|`+ date +`
+` + postData, function(err) {
+                    if(err) {
+                        return console.log(err);
+                    }
+                    setTimeout(function() {
+                        exec('openssl dgst -sha256 -sign private.pem -out sign.sha256 pixout.txt', function() {
+                            setTimeout(function() {
+                                exec('openssl base64 -A -in sign.sha256 -out sign.sha256.base64', function(error, stdout, stderr) {
+                                    setTimeout(function() {
+                                        fs.readFile('sign.sha256.base64', function read(err, data) {
+                                            if (err) {
+                                                throw err;
+                                            }
+                                            let signature = data;
+                                            console.log(data.toString())
+                                            request.post('https://api.iugu.com/v1/transfer_requests', {
+                                                headers: {
+                                                    'Signature': 'signature=' + signature.toString(),
+                                                    'Content-Type': 'application/json',
+                                                    'Request-Time': date,
+                                                    'Cookie': '__cfruid=c395e166771294839b3e723f2d66168fbdb418d1-1664837951'
+                                                }, body: postData
+                                            }, function (err, stat, details) {
+                                              try {
+                                                let status = JSON.parse(details)['status'];
+                                                console.log(status)
+                                                if(status == 'done') {
+                                                  if(users[user.email])
+                                                  users[user.email].socket.forEach(function(asocket) {
+                                                    if(io.sockets.connected[asocket])
+                                                    io.sockets.connected[asocket].emit('notify','success','Saque de ' + row[0].amount +' feito para o CPF: ' + row[0].pix);
+                                                  });
+                                                } else {
+                                                  if(users[user.email])
+                                                  users[user.email].socket.forEach(function(asocket) {
+                                                    if(io.sockets.connected[asocket]) {
+                                                      transporter.sendMail(
+                                                        {
+                                                          from: "suporte@beyondoficial.com",
+                                                          to: row[0].user,
+                                                          subject: "Saque Cancelado",
+                                                          text: `Seu saque foi cancelado, solicite outro com a chave PIX correta!!!`
+                                                        },
+                                                        (err, info) => {
+                                                        }
+                                                      );
+                                                      io.sockets.connected[asocket].emit('notify','error','Erro ao solicitar o saque para o CPF: ' + row[0].pix);
+                                                      connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + connection.escape(parseFloat(row[0].amount)) + ' WHERE `email` = ' + connection.escape(row[0].email));
+                                                      connection.query('UPDATE `config` SET `banca` = `banca` + ' + parseFloat(row[0].amount) + ' WHERE `id` = 1');
+                                                      details.status = 2;
+                                                    }
+                                                  });
+                                                }
+                                              } catch(e) {
+                                                try {
+                                                  
+                                                  if(users[user.email])
+                                                  users[user.email].socket.forEach(function(asocket) {
+                                                    if(io.sockets.connected[asocket]) {
+                                                      io.sockets.connected[asocket].emit('notify','error','Erro ao solicitar o saque para o CPF: ' + row[0].pix);
+                                                      connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + connection.escape(parseFloat(row[0].amount)) + ' WHERE `email` = ' + connection.escape(row[0].email));
+                                                      connection.query('UPDATE `config` SET `banca` = `banca` + ' + parseFloat(row[0].amount) + ' WHERE `id` = 1');
+                                                      details.status = 2;
+                                                    }
+                                                  });
+                                                } catch(e) {
+
+                                                }
+                                              }
+                                            });
+                                        });
+                                    }, 200);
+                                });
+                            }, 200);
+                        });
+                    }, 200);
+                }); 
+                
+                
+            });
+            }
+            connection.query('UPDATE `withdraw` SET `status` = ' + connection.escape(parseInt(details.status)) + ' WHERE `id` = ' + connection.escape(parseInt(details.id)));
+            socket.emit('admin withdraw edit success');
+          }
+        });
+      }
+    } catch(e) {
+      console.log(e);
+    }
+  })
+
+  //DICE
+	socket.on('dice-bet', function(play) {
+  
+		if (!user) return socket.emit('notify', 'error', 'notLoggedIn');
+    if(user.rank == 'user') return;
+		if (!play) return socket.emit('notify', 'error', 'dicePlayFailed');
+		if ((typeof play.value != 'string') && (typeof play.value != 'number')) return socket.emit('notify', 'error', 'dicePlayFailed');
+		if ((typeof play.limit != 'string') && (typeof play.limit != 'number')) return socket.emit('notify', 'error', 'dicePlayFailed');
+		if ((typeof play.type != 'string') && (typeof play.type != 'number')) return socket.emit('notify', 'error', 'dicePlayFailed');
+		betAmount = parseFloat(play.value);
+		if (betAmount < 0) return socket.emit('notify', 'error', 'dicePlayFailed');
+		play.limit = parseInt(play.limit);
+		type = parseInt(play.type)
+		if (isNaN(betAmount)) return socket.emit('notify', 'error', 'cannotParseValue');
+		if (isNaN(play.limit)) return socket.emit('notify', 'error', 'cannotParseValue');
+		if (isNaN(type)) return socket.emit('notify', 'error', 'cannotParseValue');
+		
+		if (play.limit < 5 || play.limit > 9500) return socket.emit('notify', 'error', 'dicePlayFailed');
+		
+		if (betAmount < config.min_dice_bet) return socket.emit('notify', 'error', 'diceMinBet', [play, config.min_dice_bet]);
+		if (betAmount > config.max_dice_bet) return socket.emit('notify', 'error', 'diceMaxBet', [play, config.max_dice_bet]);
+
+
+		connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(user.email) + ' LIMIT 1', function(err, row) {
+			if ((err) || (!row.length)) {
+				return [socket.emit('notify', 'error', 'dicePlayFailed'), logger.debug(err)];
+			}
+
+      let levelUpXp = 8000 + (600 * (row[0].level+1));
+      let newXP = (row[0].xp + (betAmount*10));
+
+      console.log(levelUpXp, newXP)
+      if(newXP >= levelUpXp) {
+        connection.query('UPDATE `users` SET `xp` = '+ parseFloat(newXP - levelUpXp) +', `level` = `level` + 1 WHERE `email` = '+connection.escape(user.email));
+        if (users[user.email]) {
+          users[user.email].socket.forEach(function(asocket) {
+            if (io.sockets.connected[asocket]) {
+              io.sockets.connected[asocket].emit('xp change', {
+                newXP: parseFloat(newXP - levelUpXp),
+                level: row[0].level + 1
+              });
+            }
+          });
+        }
+      } else {
+        connection.query('UPDATE `users` SET `xp` = `xp` + '+ parseFloat((betAmount*10)) +' WHERE `email` = '+connection.escape(user.email));
+        if (users[user.email]) {
+          users[user.email].socket.forEach(function(asocket) {
+            if (io.sockets.connected[asocket]) {
+              io.sockets.connected[asocket].emit('xp change', {
+                newXP: newXP,
+                level: row[0].level
+              });
+            }
+          });
+        }
+      }
+
+
+			if (row[0].wallet >= parseFloat(betAmount) || row[0].wallet_bonus > 0) {
+        let change_bonus = false;
+        let texto = '`wallet` = `wallet`';
+        if(row[0].wallet <= 0)  {
+          texto = '`wallet_bonus` = `wallet_bonus`';
+          change_bonus = true;
+        }
+        if(row[0].wallet > 0 && row[0].wallet < parseFloat(betAmount) && (row[0].wallet_bonus - row[0].wallet) >= parseFloat(betAmount) && row[0].wallet_bonus > 0) { 
+          texto = '`wallet` = 0, `wallet_bonus` = `wallet_bonus`';
+          betAmount -= row[0].wallet;
+          change_bonus = true;
+        }
+
+        let change_bonus_value = 0;
+        if(change_bonus) change_bonus_value = betAmount - row[0].wallet; 
+
+        let bonus = parseFloat(betAmount / 30);
+        bonus = bonus.toFixed(2);
+				connection.query('UPDATE `users` SET ' + texto + ' - '+parseFloat(betAmount)+', `total_bet` = `total_bet` + '+parseFloat(betAmount)+' WHERE `email` = '+connection.escape(user.email), function(err2, row2) {
+				
+					if(err2) {
+						return [socket.emit('notify','error','dicePlayFailed'),console.log(err2)];
+					} else {
+            if(row[0].wallet <= 0) {
+              if((row[0].bonus - bonus) < 0)  {
+                connection.query('UPDATE `users` SET `bonus` = 0 WHERE `email` = '+connection.escape(user.email));
+              } else {
+                connection.query('UPDATE `users` SET `bonus` = `bonus` - ' + parseFloat(bonus) + ' WHERE `email` = '+connection.escape(user.email));
+              }
+            }
+
+            connection.query('UPDATE `users` SET `wager` = `wager` + '+parseFloat(betAmount)+' WHERE `email` = '+connection.escape(user.email), function(err3) {
+              if (err3) {
+                console.log('error updating wager: ' + user.username);
+                console.log(err3);
+              }
+              else{
+                connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(user.email)+', `game` = "dice", `value_entry` = ' +connection.escape(betAmount)+ ', `value_roi` = 0 , `value_total` = ' + connection.escape(betAmount) + ', `value_bonus` = ' + connection.escape(change_bonus_value) + ', `change` = -'+connection.escape(betAmount)+', `reason` = \'Dice '+'play'+'\'', function(err4, row3) {
+                  if(err4) {
+                    return [logger.error('important error at wallet_change'),console.log(err3),socket.emit('notify','error','serverError')];
+                  } else {
+                    if (users[user.email]) {
+                      users[user.email].socket.forEach(function(asocket) {
+                        if (io.sockets.connected[asocket])
+                          io.sockets.connected[asocket].emit('balance change', parseInt('-' + betAmount));
+                      });
+                    }
+                    var currgame = dice_games[user_dice_current[user.email]];
+                    var multiplier = ((100 / (((play.type == 0 || play.type == "0") ? play.limit : 10000 - play.limit)  / 100)) * (1 - 0.04));
+                    if (play.type == 0 || play.type == "0") {
+                      if (currgame.roll < play.limit) {
+                        //won
+                        profit = betAmount * multiplier - betAmount;
+                      } else {
+                        profit = -betAmount;
+
+                      }
+
+                    } else {
+                      if (currgame.roll > play.limit) {
+                        //won
+                        profit = betAmount * multiplier - betAmount;
+                      } else {
+                        profit = -betAmount;
+                      }
+                    }
+                    dice_games[user_dice_current[user.email]] = {
+                      "hash": currgame.hash,
+                      "id": dice_games.count,
+                      "limit": play.limit,
+                      "multiplier": multiplier,
+                      "profit": profit,
+                      "roll": currgame.roll,
+                      "secret": currgame.secret,
+                      "type": play.type,
+                      "value": betAmount,
+                      "user": {
+                        "avatar": getLevelByLevel(user.level),
+                        "id": user.username,
+                        "rank": user.rank,
+                        "username": user.username,
+                        "email": user.email
+                      }
+                    };
+                    if(profit > 0){
+                      connection.query('UPDATE `users` SET ' + texto + ' + '+parseFloat(betAmount * multiplier)+', `total_bet` = `total_bet` + '+parseFloat(betAmount * multiplier)+' WHERE `email` = '+connection.escape(user.email), function(err5, row2) {
+        
+                        if(err5) {
+                          return [socket.emit('notify','error','dicePlayFailed'),logger.debug(err2)];
+                        } else {
+                          connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(user.email)+', `game` = "dice", `value_entry` = ' +connection.escape(betAmount)+ ', `value_roi` = ' + connection.escape((betAmount * multiplier) - betAmount) + ', `value_total` = ' + connection.escape(betAmount * multiplier) + ', `value_bonus` = ' + connection.escape(change_bonus_value) + ', `change` = '+connection.escape(betAmount * multiplier)+', `reason` = \'Dice '+'win'+'\'', function(err6, row3) {
+                            if(err6) {
+                              return [logger.error('important error at wallet_change'),logger.debug(err3),socket.emit('notify','error','serverError')];
+                            } 
+                          });
+                        }
+                      });
+                    } else {
+                      connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(user.email) + ' LIMIT 1', function (err, row) {
+                        if (!err) {
+                          if(row[0].last_deposit > 0 && row[0].wallet == 0) {
+
+                            let referrer_email = row[0].inviter;
+                            connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(row[0].inviter) + ' LIMIT 1', function (err, inviter) {
+                              if(!err && inviter.length > 0) {
+
+                                let reward = (inviter[0].referPercent / 100) * (parseFloat(row[0].last_deposit));
+                                connection.query('UPDATE `users` SET `referRewards` = `referRewards` + ' + parseFloat(reward) + ' WHERE `email` = ' + connection.escape(referrer_email));
+                                connection.query('UPDATE `users` SET `last_deposit` = 0 WHERE `email` = ' + connection.escape(user.email));
+                              }
+                            });
+                          }
+                        }
+                      });
+                    }
+                    io.sockets.emit('dice-game', {
+                      "game": dice_games[user_dice_current[user.email]]
+                    });
+                    socket.emit('dice-result', {
+                      "game": dice_games[user_dice_current[user.email]],
+                      "hash": generateDiceGame(user.email)
+                    });
+                    
+                  }
+                });
+              }
+            });
+					}
+				});
+			} else {
+				return socket.emit('notify', 'error', 'notEnoughCoins');
+			}
+		});
+	});
+
+  socket.on('update details', function(details) {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    let name = details.name;
+    let lastname = details.lastname;
+    let cpf = details.cpf;
+    let phone = details.phone;
+
+    if(user.name != null) name = user.name;
+    if(user.last_name != null) lastname = user.last_name;
+    if(user.cpf != null) cpf = user.cpf;
+    if(user.phone != null && user.phone) phone = user.phone;
+
+    if(
+      name != undefined || lastname != undefined || 
+      cpf != undefined || phone != undefined || 
+      name != null || lastname != null || 
+      cpf != null || phone != null || phone != ''
+    ) {
+      connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(user.email) + ' LIMIT 1', function (err, row) {
+        if (err) { console.log(err); return }
+        if(row.length > 0) {
+          connection.query('SELECT * FROM `users` WHERE `cpf` = ' + connection.escape(cpf) + ' LIMIT 1', function (err1, row1) {
+            if((!err1 && row1.length == 0) || user.cpf != null) {
+              connection.query('UPDATE `users` SET `name` = ' + connection.escape(name) + ', `last_name` = ' + connection.escape(lastname) + ', `cpf` = ' + connection.escape(cpf) + ', `phone` = ' + connection.escape(phone) + ' WHERE `email` = ' + connection.escape(user.email), function(err, rows) {
+                if(!err) {
+                  socket.emit('notify','success','Dados alterados com sucesso.');
+                } else {
+                  socket.emit('notify','error','Erro ao editar os dados, atualize a página e tente novamente.');
+                }
+              });
+            } else {
+              socket.emit('notify','error','CPF Já cadastrado em nosso registro, tente um válido.');
+            }
+          });
+        }
+      })
+    }
+
+  });
+
+  socket.on('withdraw', function (details) {
+    if (parseFloat(details.pixamount) <= 99 || parseFloat(details.pixamount) > 3000) return;
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(user.email) + ' LIMIT 1', function (err, row) {
+      if (err) { console.log(err);
+      return}
+      if (row[0].last_withdraw == null || (((Date.now()/1000 - row[0].last_withdraw/1000) / 60) / 60) >= 23) {
+        if (row[0].wallet >= parseFloat(details.pixamount)) {
+            details.pix = user.cpf;
+            /*if(row[0].anti_bot >= parseFloat(details.pixamount)) {
+
+            } else {
+              socket.emit('notify','error','Você precisa apostar no mínimo: R$' + parseFloat(details.pixamount) + ' para poder sacar');
+            }*/
+            let totalWallet = row[0].wallet;
+            if(row[0].bonus == 0) totalWallet += row[0].wallet_bonus;
+            
+            if(totalWallet - parseFloat(details.pixamount) < 0) {
+              socket.emit('notify','error','withdrawBalanceError');
+            } else {
+              if(row[0].bonus == 0 && row[0].wallet_bonus > 0 && (row[0].wallet - parseFloat(details.pixamount) < 0)) {
+                let newValueBonus = parseFloat(details.pixamount) - row[0].wallet;
+                connection.query('INSERT INTO `withdraw` SET `email` = ' + connection.escape(user.email) + ', `amount` = ' + connection.escape(parseFloat(details.pixamount)) + ', `pix` = ' + connection.escape(details.pix), function (err3, row3) {
+                  if (err3) {
+                    console.log(err3)
+                  } else {
+                    connection.query('UPDATE `users` SET `last_withdraw` = ' + Date.now() + ', `wallet` = 0, `wallet_bonus` = `wallet_bonus` - ' + connection.escape(parseFloat(newValueBonus)) + ' WHERE `email` = ' + connection.escape(user.email));
+                    socket.emit('notify','success','withdrawSuccess');
+                    socket.emit('balance change', parseFloat('-' + parseFloat(details.pixamount)));
+                  }
+                }); 
+              } else {
+                connection.query('INSERT INTO `withdraw` SET `email` = ' + connection.escape(user.email) + ', `amount` = ' + connection.escape(parseFloat(details.pixamount)) + ', `pix` = ' + connection.escape(details.pix), function (err3, row3) {
+                  if (err3) {
+                    console.log(err3)
+                  } else {
+                    connection.query('UPDATE `users` SET `last_withdraw` = ' + Date.now() + ', `wallet` = `wallet` - ' + connection.escape(parseFloat(details.pixamount)) + ' WHERE `email` = ' + connection.escape(user.email));
+                    socket.emit('notify','success','withdrawSuccess');
+                    socket.emit('balance change', parseFloat('-' + parseFloat(details.pixamount)));
+                  }
+                }); 
+              }
+            }
+        } else {
+          socket.emit('notify','error','withdrawBalanceError');
+        }
+      } else {
+        socket.emit('notify','error','withdrawErrorDaily');
+      }
+    });
+  });
+
+  socket.on('deposit pix', function (details) {
+    try {
+      if (details.amount < 20) return;
+
+      const cpf = (details.cpf).replace('-', '').replace('.', '')
+      const bonus = details.bonus;
+
+      function padTo2Digits(num) {
+        return num.toString().padStart(2, '0');
+      }
+
+      function formatDate(date) {
+        return [
+          date.getFullYear(),
+          padTo2Digits(date.getMonth() + 1),
+          padTo2Digits(date.getDate())
+        ].join('-');
+      }
+
+      let payment_data = {
+        "email": "thebeyondgamesoficial@gmail.com",
+        "due_date": formatDate(new Date()),
+        "items": [
+          {
+            "description": "Créditos Beyond",
+            "quantity": 1,
+            "price_cents": parseFloat(details.amount) * 100
+          }
+        ],
+        "payable_with": "pix",
+        "payer": {
+          "cpf_cnpj": cpf,
+          "name": user.email,
+          "phone_prefix": "11",
+          "phone": "11989911000",
+          "email": user.email,
+          "address": {
+            "zip_code": "29190560",
+            "street": "Rua A",
+            "number": "100",
+            "district": "Polivalente",
+            "city": "São Paulo",
+            "state": "SP",
+            "country": "Brasil",
+            "complement": "ap 32"
+          }
+        }
+      }
+
+      request.post({
+        url: 'https://api.iugu.com/v1/invoices?api_token=5E1986B98F8A8AECDEA328651DE7982CB29717B3815753DBC131A48E80845CB9',
+        json: payment_data
+      }, function (error, response, body) {
+        try {
+          const qrcode = body.pix.qrcode
+          const qrcodeText = body.pix.qrcode_text
+          const transactionId = body.id
+
+          connection.query('INSERT INTO `payment_history` SET `user` = ' + connection.escape(user.email) + ', `bonus` = ' + connection.escape(bonus) + ', `offer_id` = ' + connection.escape(transactionId) + ', `offer_state` = "pending", `worth` = ' + connection.escape(parseFloat(details.amount)) + ', `type` = "pix"', function (err3, row3) {
+            if (!err3) {
+              socket.emit('payment pix', {code: qrcode, value: details.amount, text: qrcodeText});
+            } else {
+              console.log(err3)
+            }
+          })
+
+        } catch (error) {
+          console.log(error)
+        }
+      })
+
+    } catch (error) {
+      console.log(error)
+    }
+  })
+ 
+
+  socket.on('doubleplus play', function(data) {
+
+    let amount = parseFloat(data.value);
+    let multiplier = data.multiplier
+    console.log(data)
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    
+    if(amount < 1) return socket.emit('notify','error','rouletteMinBet', [amount,1]);
+    if(amount > 1000 && user.rank == 'user') return socket.emit('notify','error','rouletteMaxBet', [amount,1000]);
+
+    let bonus_round = false;
+    if(doubleplus.betting) {
+      if(multiplier > 1) {
+        connection.query("SELECT * FROM users WHERE email = " + connection.escape(user.email), function (err, rows) {
+          if(!err && rows.length > 0) {
+            let row = rows[0];
+            row.avatar = getLevelByLevel(row.level);
+  
+            if(parseFloat(row.wallet) >= amount || parseFloat(row.wallet_bonus) >= amount || (parseFloat(row.wallet) + parseFloat(row.wallet_bonus)) > 0) {
+              let texto = '`wallet` = `wallet`';
+              if(row.wallet <= 0) texto = '`wallet_bonus` = `wallet_bonus`';
+              if(row.wallet > 0 && row.wallet < parseFloat(amount) && (row.wallet_bonus - row.wallet) >= parseFloat(amount) && row.wallet_bonus > 0) { 
+                texto = '`wallet` = 0, `wallet_bonus` = `wallet_bonus`';
+                amount -= row.wallet;
+              }
+              connection.query("UPDATE users SET " + texto + " - " + parseFloat(amount) + " WHERE email = " + connection.escape(user.email), function(err1, row1) {
+                if(!err1) {
+                  if(texto == '`wallet_bonus` = `wallet_bonus`') amount += row.wallet;
+                  let bonus = parseFloat(amount / 30);
+                  bonus = bonus.toFixed(2);
+                  if(multiplier >= 1.1) {
+                    if(row.wallet <= 0) {
+                      if((row.bonus - bonus) < 0)  {
+                        connection.query('UPDATE `users` SET `bonus` = 0 WHERE `email` = '+connection.escape(user.email));
+                      } else {
+                        connection.query('UPDATE `users` SET `bonus` = `bonus` - ' + parseFloat(bonus) + ' WHERE `email` = '+connection.escape(user.email));
+                      }
+                      bonus_round = true;
+                    }
+
+                  }
+                  let levelUpXp = 8000 + (600 * (rows[0].level+1));
+                  let newXP = (rows[0].xp + (parseFloat(amount)*10));
+                  if(newXP >= levelUpXp) {
+                    connection.query('UPDATE `users` SET `xp` = '+ parseFloat(newXP - levelUpXp) +', `level` = `level` + 1 WHERE `email` = '+connection.escape(user.email));
+                    if (users[user.email]) {
+                      users[user.email].socket.forEach(function(asocket) {
+                        if (io.sockets.connected[asocket]) {
+                          io.sockets.connected[asocket].emit('xp change', {
+                            newXP: parseFloat(newXP - levelUpXp),
+                            level: row.level+1
+                          });
+                        }
+                      });
+                    }
+                  } else {
+                    connection.query('UPDATE `users` SET `xp` = `xp` + '+ parseFloat((parseFloat(amount)*10)) +' WHERE `email` = '+connection.escape(user.email));
+                    if (users[user.email]) {
+                      users[user.email].socket.forEach(function(asocket) {
+                        if (io.sockets.connected[asocket]) {
+                          io.sockets.connected[asocket].emit('xp change', {
+                            newXP: newXP,
+                            level: row.level
+                          });
+                        }
+                      });
+                    }
+                  }
+                  connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(user.email)+', `game` = "x-double", `change` = -'+connection.escape(amount)+', `reason` = \'Double Plus '+'play'+'\'', function(err4, row3) {
+                    if(!err4) {
+                      
+                      doubleplus.bets.push({
+                        multiplier: multiplier,
+                        amount: amount,
+                        user: row,
+                        bonus: bonus_round
+                      });
+                      io.emit('new doubleplus bet', doubleplus.bets);
+                      try {
+                        users[user.email].socket.forEach(function(asocket) {
+                          if(io.sockets.connected[asocket])
+                          io.sockets.connected[asocket].emit('balance change', parseFloat('-'+amount));
+                          if(io.sockets.connected[asocket])
+                          io.sockets.connected[asocket].emit('notify','success','Você apostou R$'+amount+' no multiplicador ' + multiplier + 'x');
+                        });
+                      } catch(e) {
+
+                      }
+
+                    } else {
+                      
+                    }
+                  });
+                } else {
+                  
+                }
+              });
+            } else {
+              users[user.email].socket.forEach(function(asocket) {
+                io.sockets.connected[asocket].emit('notify','error','Você não tem o valor necessário para apostar esse valor!');
+              });
+            }
+          } else {
+            
+          }
+        });
+      } else {
+        users[user.email].socket.forEach(function(asocket) {
+          io.sockets.connected[asocket].emit('notify','error','Você tem que selecionar um multiplicador maior que 1.00x');
+        });
+      }
+    } else {
+      users[user.email].socket.forEach(function(asocket) {
+        io.sockets.connected[asocket].emit('notify','error','Espere o início da próxima rodada!');
+      });
+    }
+  });
+
+  socket.on('roulette play', function(play, color) {
+    if(doubleBetsClose) return;
+
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    // if(user.rank == 'user') return socket.emit('notify','error','Jogo em manutenção');
+    if((!play) || (!color)) return socket.emit('notify','error','roulettePlayFailed');
+    if((typeof play != 'string') && (typeof play != 'number')) return socket.emit('notify','error','roulettePlayFailed');
+    if(typeof color != 'string') return socket.emit('notify','error','roulettePlayFailed');
+    if((usersBr[user.email] !== undefined) && (usersBr[user.email] == 3)) {
+      socket.emit('notify','error','rouletteMaxBets',[3]);
+      return;
+    }
+    play = parseFloat(play);
+    if(isNaN(play)) return socket.emit('notify','error','cannotParseValue');
+    play = ''+play;
+    if(color !== 'green' && color !== 'red' && color !== 'black') return socket.emit('notify','error','rouletteUnknownColor');
+    if(play < 1) return socket.emit('notify','error','rouletteMinBet', [play,1]);
+    if(play > 1000) return socket.emit('notify','error','rouletteMaxBet', [play,1000]);
+    let bonus_bet = false;
+    if(!pause) {
+      connection.query('SELECT * FROM `users` WHERE `email` = '+connection.escape(user.email)+' LIMIT 1', function(err, row) {
+        if((err) || (!row.length)) {
+          console.log(err);
+          socket.emit('notify','error','roulettePlayFailed');
+          return;
+        }
+        if(row[0].wallet >= parseFloat(play) || row[0].wallet_bonus >= parseFloat(play)) {
+          let texto = '`wallet` = `wallet`';
+          if(row[0].wallet <= 0) { texto = '`wallet_bonus` = `wallet_bonus`'; bonus_bet = true; }
+          if(row[0].wallet > 0 && row[0].wallet < parseFloat(play) && (row[0].wallet_bonus - row[0].wallet) >= parseFloat(play)) { 
+            texto = '`wallet` = 0, `wallet_bonus` = `wallet_bonus`';
+            play = (parseFloat(play) - row[0].wallet);
+
+            bonus_bet = true;
+          }
+
+          let bonus_wallet_change = 0;
+          if(bonus_bet) bonus_wallet_change = parseFloat(play) - row[0].wallet;
+          connection.query('UPDATE `users` SET ' + texto + ' - '+parseFloat(play)+', `total_bet` = `total_bet` + '+parseFloat(play)+' WHERE `email` = '+connection.escape(user.email), function(err2, row2) {
+
+          if(err2) {
+            console.log(err2);
+            socket.emit('notify','error','roulettePlayFailed');
+            return;
+          }
+          let cor;
+          if(color == 'green') cor = 'branco';
+          if(color == 'black') cor = 'preto';
+          if(color == 'black') cor = 'roxo';
+          connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(user.email)+', `game` = "double", `value_entry` = ' +connection.escape(parseFloat(play))+ ', `value_roi` = 0 , `value_total` = 0, `value_bonus` = ' + connection.escape(bonus_wallet_change) + ', `change` = -'+connection.escape(play)+', `reason` = \'Roleta #'+currentRollid+' '+color+'\'', function(err3, row3) {
+          if(err3) {
+            console.log('important error at wallet_change');
+            console.log(err3);
+            socket.emit('notify','error','serverError');
+            return;
+          }
+          if(usersBr[user.email] === undefined) {
+            usersBr[user.email] = 1;
+            let bonus = parseFloat(play / 30);
+
+            connection.query('UPDATE `users` SET `anti_bot` = `anti_bot` + ' + parseFloat(play) + ' WHERE `email` = '+connection.escape(user.email));
+
+            if(row[0].wallet <= 0 && bonus_bet) {
+              
+              if((row[0].bonus - bonus) < 0)  {
+                connection.query('UPDATE `users` SET `bonus` = '+ parseFloat(0) +' WHERE `email` = '+connection.escape(user.email));
+              } else {
+                connection.query('UPDATE `users` SET `bonus` = `bonus` - '+ parseFloat(bonus) +' WHERE `email` = '+connection.escape(user.email));
+              }
+            }
+            let levelUpXp = 8000 + (600 * (row[0].level+1));
+            let newXP = (row[0].xp + (play*10));
+            if(newXP >= levelUpXp) {
+              connection.query('UPDATE `users` SET `xp` = '+ parseFloat(newXP - levelUpXp) +', `level` = `level` + 1 WHERE `email` = '+connection.escape(user.email));
+              if (users[user.email]) {
+                users[user.email].socket.forEach(function(asocket) {
+                  if (io.sockets.connected[asocket]) {
+                    io.sockets.connected[asocket].emit('xp change', {
+                      newXP: parseFloat(newXP - levelUpXp),
+                      level: row[0].level + 1
+                    });
+                  }
+                });
+              }
+            } else {
+              connection.query('UPDATE `users` SET `xp` = `xp` + '+ parseFloat((play*10)) +' WHERE `email` = '+connection.escape(user.email));
+              if (users[user.email]) {
+                users[user.email].socket.forEach(function(asocket) {
+                  if (io.sockets.connected[asocket]) {
+                    io.sockets.connected[asocket].emit('xp change', {
+                      newXP: newXP,
+                      level: row[0].level
+                    });
+                  }
+                });
+              }
+            }
+          } else {
+            usersBr[user.email]++;
+          }
+          io.sockets.to('roulette').emit('roulette player',{
+            amount: play,
+            player: {
+              avatar: getLevelByLevel(user.level),
+              username: user.username
+            }
+          }, color);
+          currentBets[color].push({
+            amount: play,
+            player: {
+              avatar: getLevelByLevel(user.level),
+              level: user.level,
+              username: user.username,
+              email: user.email,
+              rank: user.rank,
+              bonus: bonus_bet
+            }
+          });
+          try {
+            if(users[user.email])
+            users[user.email].socket.forEach(function(asocket) {
+              if(io.sockets.connected[asocket]) {
+                if(row[0].wallet > 0 && row[0].wallet < parseFloat(play) && (row[0].wallet_bonus - row[0].wallet) >= parseFloat(play)) {
+                  io.sockets.connected[asocket].emit('balance change', parseFloat('-'+ (play + row[0].wallet)));
+                } else {
+                  io.sockets.connected[asocket].emit('balance change', parseFloat('-'+play));
+                }
+              }
+              if(io.sockets.connected[asocket])
+              if(color == 'red') color = 'roxo';
+              if(color == 'black') color = 'preto';
+              if(color == 'green') color = 'branco';
+              if(row[0].wallet > 0 && row[0].wallet < parseFloat(play) && (row[0].wallet_bonus - row[0].wallet) >= parseFloat(play)) {
+                io.sockets.connected[asocket].emit('notify','success','roulettePlaySuccess',[(play + row[0].wallet),color,usersBr[user.email],3]);
+              } else {
+                io.sockets.connected[asocket].emit('notify','success','roulettePlaySuccess',[play,color,usersBr[user.email],3]);
+              }
+              
+            });
+          } catch(e) {
+              
+          }
+          });
+          });
+        } else {
+          socket.emit('notify','error','notEnoughCoins');
+        }
+      });
+    } else 
+      socket.emit('notify','error','roulettePlayFailed');
+  });
+
+  socket.on('crash bet', function(play) {
+
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    if(play_try[user.username]) return;
+    if(cstatus === 'closed' || cstatus === 'drop') return socket.emit('notify','error','crashPlayFailed');
+    if(!play) return socket.emit('notify','error','crashPlayFailed');
+    if(!play.bet) return socket.emit('notify','error','crashPlayFailed');
+    if(typeof play.cashout === 'undefined') return socket.emit('notify','error','crashPlayFailed');
+    if(play.cashout !== '' && typeof play.cashout !== 'number') return socket.emit('notify','error','crashPlayFailed');
+    if(typeof play.bet !== 'number') return socket.emit('notify','error','crashPlayFailed');
+    play.bet = parseFloat(play.bet);
+    if(isNaN(play.bet)) return socket.emit('notify','error','cannotParseValue');
+    play.bet = ''+play.bet;
+    play.bet = play['bet'].replace(/\D/g,'');
+    if(play.bet < 1) return socket.emit('notify','error','crashMinBet', [play.bet,1]);  
+    if(play.bet > 1000) return socket.emit('notify','error','crashMaxBet', [play.bet,1000]);
+    play_try[user.username] = 1;
+
+    connection.query('SELECT `wallet`,`deposit_sum` FROM `users` WHERE `email` = '+connection.escape(user.email)+' LIMIT 1', function(err, row) {
+      if((err) || (!row.length)) {
+        return [socket.emit('notify','error','crashPlayFailed'),console.log(err),delete play_try[user.username]];
+      }
+      if(row[0].wallet >= parseFloat(play.bet)) { 
+        var find = cbets.find(x => x.profile.email == user.email);
+        if(find != undefined) return [socket.emit('notify','error','crashPlayFailed'),delete play_try[user.username]];
+        connection.query('UPDATE `users` SET `wallet` = `wallet` - '+parseFloat(play.bet)+', `total_bet` = `total_bet` + '+parseInt(play.bet)+' WHERE `email` = '+connection.escape(user.email), function(err2, row2) {
+          if(row[0].deposit_sum >= 2500){
+          connection.query('UPDATE `users` SET `wager` = `wager` + '+parseInt(play.bet)+' WHERE `email` = '+connection.escape(user.email));		  
+      }          
+      if(err2) {
+            return [socket.emit('notify','error','crashPlayFailed'),console.log(err2),delete play_try[user.username]];
+          } else {
+            connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(user.email)+', `game` = "crash", `value_entry` = ' +connection.escape(play.bet)+ ', `value_roi` = 0, `value_total` = ' + connection.escape(play.bet) + ', `value_bonus` = 0, `change` = -'+connection.escape(play.bet)+', `reason` = \'Crash #'+cgame+' - cashout at '+play.cashout+'\'', function(err3, row3) {
+              if(err3) {
+                return [console.log('important error at wallet_change'),console.log(err3),socket.emit('notify','error','serverError'),delete play_try[user.username]];
+              } else {
+                cbets.push({
+                  bet: play.bet,
+                  profile: {
+                    avatar: getLevelByLevel(user.level),
+                    username: user.username,
+                    id: user.id,
+                    email: user.email,
+                    rank: user.rank
+                  }
+                });
+                players_cashouts[user.email] = play.cashout;
+                io.sockets.to('crash').emit('player new', cbets);
+                delete play_try[user.username];
+                if(users[user.email])
+                users[user.email].socket.forEach(function(asocket) {
+                  if(io.sockets.connected[asocket])
+                  io.sockets.connected[asocket].emit('balance change', parseFloat('-'+play.bet));
+                  if(io.sockets.connected[asocket])
+                  io.sockets.connected[asocket].emit('notify','success','crashPlaySuccess',[play.bet]);
+                });
+              }
+            });
+          }
+        });
+      } else {
+        delete play_try[user.username];
+        return socket.emit('notify','error','notEnoughCoins');
+      }
+
+    });
+  });
+  socket.on('crash withdraw', function(){
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    crashWithdraw(user);
+  });
+
+  //TOWER GAME
+  socket.on('tower start', function(details) {
+    console.log('START')
+    //return socket.emit('notify','error','Jogo em manutenção');
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    let amount = details.amount;
+    console.log(details)
+    if(parseInt(details.risk) > 0 && parseInt(details.risk) <= 4 && parseFloat(amount) >= 1) {
+      if(!towerGames[user.email] || towerGames[user.email].status == 2) {
+        console.log('FUNCIONANDO')
+        connection.query('SELECT * FROM `users` WHERE `email` = '+connection.escape(user.email)+' LIMIT 1', function(err, row) {
+          if(row[0]['wallet'] >= amount) {
+            connection.query('UPDATE `users` SET `wallet` = `wallet` - ' + parseFloat(amount) + ', `total_bet` = `total_bet` + '+parseFloat(amount)+' WHERE `email` = ' + connection.escape(user.email));
+            connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(user.email)+', `game` = "tower", `change` = -'+connection.escape(amount)+', `reason` = \'Tower '+'bet'+'\'', function(err6, row3) {
+              if(!err6) {
+                towerLastId++;
+                towerGames[user.email] = {
+                  id: towerLastId,
+                  value: amount,
+                  risk: details.risk,
+                  status: 1,
+                  row: 0,
+                  bombs: [],
+                  profile: {
+                    username: user.username
+                  }
+                }
+
+                if(users[user.email])
+                users[user.email].socket.forEach(function(asocket) {
+                  if(io.sockets.connected[asocket])
+                  io.sockets.connected[asocket].emit('balance change', parseFloat('-'+amount));
+                  if(io.sockets.connected[asocket])
+                  io.sockets.connected[asocket].emit('notify','success','Jogo criado com sucesso, escolha alguma casa para começar.');
+                  if(io.sockets.connected[asocket])
+                  io.sockets.connected[asocket].emit('tower start', towerGames[user.email]);
+                });
+              } 
+            });
+          }
+        });
+      } else {
+        console.log('FUNCIONANDO N')
+      }
+    }
+  });
+
+  socket.on('tower click', function(details) {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(towerGames[user.email] && towerGames[user.email].status != 1) return socket.emit('notify','error','Crie um novo jogo para abrir novas salas.');
+    function getTileRow(number) {
+      if(number/5 <= 1) return 1;
+      if(number/5 > 1 && number/5 <= 2) return 2;
+      if(number/5 > 2 && number/5 <= 3) return 3;
+      if(number/5 > 3 && number/5 <= 4) return 4;
+      if(number/5 > 4 && number/5 <= 5) return 5;
+      if(number/5 > 5 && number/5 <= 6) return 6;
+      if(number/5 > 6 && number/5 <= 7) return 7;
+      if(number/5 > 7 && number/5 <= 8) return 8;
+      if(number/5 > 8 && number/5 <= 9) return 9;
+      if(number/5 > 9 && number/5 <= 10) return 10;
+    }
+
+    console.log(details, getTileRow(details.tile))
+    if(towerGames[user.email]) {
+      let game = towerGames[user.email];
+      if(details.tile > 0 && details.tile <= 50) {
+        let tile = details.tile;
+        console.log(tile, getTileRow(tile))
+        if(getTileRow(tile) == (game.row+1)) {
+          towerGames[user.email].row++;
+          if(game.risk == 4) {
+            let winSpace = Math.floor(Math.random() * ((getTileRow(tile)*5) - ((getTileRow(tile)*5)-4) + 1) + ((getTileRow(tile)*5)-4));
+            for(let i = (towerGames[user.email].row*5 -4); i <= towerGames[user.email].row*5; i++) {
+              if(i != winSpace) {
+                towerGames[user.email].bombs.push(i);
+              }
+            }
+          } else {
+            for(let i = 1; i <= game.risk; i++) {
+              let bomb = Math.floor(Math.random() * ((getTileRow(tile)*5) - ((getTileRow(tile)*5)-4) + 1) + ((getTileRow(tile)*5)-4));
+              if(towerGames[user.email].bombs.includes(bomb)) {
+                for(let x = 0; x <= 100000; x++) {
+                  let newBomb = Math.floor(Math.random() * ((getTileRow(tile)*5) - ((getTileRow(tile)*5)-4) + 1) + ((getTileRow(tile)*5)-4));
+                  if(!towerGames[user.email].bombs.includes(newBomb)) 
+                    towerGames[user.email].bombs.push(newBomb); 
+                    break;
+                }
+              } else {
+                towerGames[user.email].bombs.push(bomb);
+              }
+            }
+          }
+          if(towerGames[user.email].bombs.includes(tile)) {
+            if(users[user.email])
+            users[user.email].socket.forEach(function(asocket) {
+              if(io.sockets.connected[asocket])
+              io.sockets.connected[asocket].emit('tower play lose', towerGames[user.email]);
+            });
+            towerGames[user.email].status = 2;
+          } else {
+            if(users[user.email])
+            users[user.email].socket.forEach(function(asocket) {
+              if(io.sockets.connected[asocket])
+              io.sockets.connected[asocket].emit('tower play win', towerGames[user.email]);
+            });
+          }
+        } else {
+          if(users[user.email])
+          users[user.email].socket.forEach(function(asocket) {
+            if(io.sockets.connected[asocket])
+            io.sockets.connected[asocket].emit('notify','error','Escolha uma casa na linha certa, para prosseguir.');
+          });
+        }
+      }
+    } else {
+      if(users[user.email])
+      users[user.email].socket.forEach(function(asocket) {
+        if(io.sockets.connected[asocket])
+        io.sockets.connected[asocket].emit('notify','error','Atualize a página e crie um jogo novo.');
+      });
+    }
+  });
+
+  socket.on('tower cashout', function() {
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    console.log('CASHOUT DSADAS')
+    function getRowReward(risk, row) {
+      if(risk == 1) {
+        if(row == 0) return 1;
+        if(row == 1) return 1.18;
+        if(row == 2) return 1.48;
+        if(row == 3) return 1.85;
+        if(row == 4) return 2.31;
+        if(row == 5) return 2.89;
+        if(row == 6) return 3.62;
+        if(row == 7) return 4.52;
+        if(row == 8) return 5.66;
+        if(row == 9) return 7.07;
+        if(row == 10) return 8.84;
+      } else if(risk == 2) {
+        if(row == 0) return 1;
+        if(row == 1) return 1.58;
+        if(row == 2) return 2.63;
+        if(row == 3) return 4.39;
+        if(row == 4) return 7.33;
+        if(row == 5) return 12.21;
+        if(row == 6) return 20.36;
+        if(row == 7) return 33.93;
+        if(row == 8) return 56.56;
+        if(row == 9) return 94.26;
+        if(row == 10) return 157.11;
+      } else if(risk == 3) {
+        if(row == 0) return 1;
+        if(row == 1) return 2.37;
+        if(row == 2) return 5.93;
+        if(row == 3) return 14.84;
+        if(row == 4) return 37.1;
+        if(row == 5) return 92.77;
+        if(row == 6) return 231.93;
+        if(row == 7) return 579.83;
+        if(row == 8) return 1449.58;
+        if(row == 9) return 3623.96;
+        if(row == 10) return 9059.9;
+      } else if(risk == 4) {
+        if(row == 0) return 1;
+        if(row == 1) return 4.75;
+        if(row == 2) return 23.75;
+        if(row == 3) return 118.75;
+        if(row == 4) return 593.75;
+        if(row == 5) return 2398.75;
+        if(row == 6) return 14843.75;
+        if(row == 7) return 74218.75;
+        if(row == 8) return 371093.75;
+        if(row == 9) return 1855468.75;
+        if(row == 10) return 9277343.75;
+      }
+    }
+
+    if(towerGames[user.email] && towerGames[user.email].status == 1) {
+      let game = towerGames[user.email];
+      connection.query('SELECT * FROM `users` WHERE `email` = '+connection.escape(user.email)+' LIMIT 1', function(err, row) {
+        let towerReward = parseFloat(parseFloat(game.value * (getRowReward(game.risk, game.row))).toFixed(2));
+        connection.query('UPDATE `users` SET `wallet` = `wallet` + ' + parseFloat(towerReward) + ' WHERE `email` = ' + connection.escape(user.email));
+        connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(user.email)+', `game` = "tower", `change` = '+connection.escape(towerReward)+', `reason` = \'Tower '+'win'+'\'', function(err6, row3) {
+          if(!err6) {
+            towerGames[user.email] = null;
+
+            if(users[user.email])
+            users[user.email].socket.forEach(function(asocket) {
+              if(io.sockets.connected[asocket])
+              io.sockets.connected[asocket].emit('balance change', parseFloat('+'+towerReward));
+              if(io.sockets.connected[asocket])
+              io.sockets.connected[asocket].emit('notify','success','Ganhos retirados com sucesso.');
+              if(io.sockets.connected[asocket])
+              io.sockets.connected[asocket].emit('tower cashout', game);
+            });
+            
+          } 
+        });
+      });
+    } else {
+
+    }
+  });
+
+  //FINISH TOWER GAME
+
+  socket.on('activate bonus', function(details){
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    let code = details.code;
+    if(code.length > 0) {
+      connection.query('SELECT * FROM `codes` WHERE `code` = ' + connection.escape(code), function(err, rows) {
+        if(rows.length == 1) {
+          let row = rows[0];
+          let amount = row.amount;
+
+          connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(user.email), function(err, rows) {
+            if(rows.length > 0) {
+              if(rows[0].deposit_sum_code >= 20) {
+                if(rows[0].code_bonus_1_activated == 0) {
+                  connection.query('UPDATE `users` SET `code_bonus_1_activated` = 1, `wallet_bonus` = ' + connection.escape(amount) + ', `bonus` = ' + connection.escape(amount) + ' WHERE `email` = ' + connection.escape(user.email), function(err, row) {
+                    console.log(err);
+                    if(users[user.email])
+                    users[user.email].socket.forEach(function(asocket) {
+                      if(io.sockets.connected[asocket])
+                      io.sockets.connected[asocket].emit('balance change', parseFloat('+' + amount));
+                      if(io.sockets.connected[asocket])
+                      io.sockets.connected[asocket].emit('notify','success','Código de bônus ativado com sucesso! +' + amount + 'R$');
+                    });
+                  });
+                } else {
+                  if(users[user.email])
+                  users[user.email].socket.forEach(function(asocket) {
+                    if(io.sockets.connected[asocket])
+                    io.sockets.connected[asocket].emit('notify','error','Esse código já foi ativado por você anteriormente.');
+                  });
+                }
+              } else {
+                if(users[user.email])
+                users[user.email].socket.forEach(function(asocket) {
+                  if(io.sockets.connected[asocket])
+                  io.sockets.connected[asocket].emit('notify','error','Não é elegível para ativar esse cupom, deposite 20R$ e tente novamente.');
+                });
+              }
+            }
+          })
+        } else {
+          if(users[user.email])
+          users[user.email].socket.forEach(function(asocket) {
+            if(io.sockets.connected[asocket])
+            io.sockets.connected[asocket].emit('notify','error','Código não existe, tente outro.');
+          });
+        }
+      });
+    }
+  });
+  socket.on('chat message', function(chat) {
+    if((!chat.message) || (!chat.type)) return;
+    if((typeof chat.message != 'string') || (typeof chat.type != 'string')) return;
+    if(last_message[user.username]+1 >= time()) {
+      return;
+    } else {
+      last_message[user.username] = time();
+    }
+    if(!user) return socket.emit('notify','error','notLoggedIn');
+    if(user.email == null || user.username == null) return socket.emit('notify','error','notLoggedIn');
+    if(chat && chat.message){
+    if(chat.message.indexOf('/') === 0){
+      var res = null;
+      if(chat.message.indexOf('/online') === 0){
+        if((user.rank === 'siteAdmin') || (user.rank === 'root') || (user.rank === 'siteMod')){
+          if (res = /^\/online ([0-9]{1,})/.exec(chat.message)) {
+            onlineFake = parseInt(res[1]);
+          } else {
+            socket.emit('notify','error','chatMissingParameters');
+          }
+        } else {
+          socket.emit('notify','error','chatModAccess');
+        }
+      } else if(chat.message.indexOf('/muteChat') === 0){
+        if((user.rank === 'siteAdmin') || (user.rank === 'root')){
+          chat_muted = true;
+          socket.emit('notify','success','chatMuted');
+        } else {
+          socket.emit('notify','error','chatAdminAccess');
+        }
+      } else if(chat.message.indexOf('/unmuteChat') === 0){
+        if((user.rank === 'siteAdmin') || (user.rank === 'root')){
+          chat_muted = false;
+          socket.emit('notify','success','chatUnmuted');
+        } else {
+          socket.emit('notify','error','chatAdminAccess');
+        }
+      } else if(chat.message.indexOf('/mute') === 0){
+        if((user.rank === 'siteAdmin') || (user.rank === 'root') || (user.rank === 'siteMod')){
+          if (res = /^\/mute ([0-9]{17})/.exec(chat.message)) {
+            connection.query('SELECT * FROM `users` WHERE `email` = '+connection.escape(res[1])+' LIMIT 1', function(mute_err, mute_callback){
+              if(mute_err){
+                return socket.emit('notify','error','chatMuteFail',[res[1]]);
+              } else {
+                if((mute_callback) && (mute_callback.length)){
+                  if(mute_callback[0].rank == 'user'){
+                    connection.query('UPDATE `users` SET `muted` = 1 WHERE `email` = '+connection.escape(res[1]),function(mute_err1) {
+                      if(mute_err1){
+                        return socket.emit('notify','error','chatMuteFail',[res[1]]);
+                      } else {
+                        return socket.emit('notify','success','chatMuteSuccess',[res[1]]);
+                      }
+                    });
+                  } else {
+                    return socket.emit('notify','error','chatMuteStaff');
+                  }
+                } else {
+                  return socket.emit('notify','error','chatMuteFail',[res[1]]);
+                }
+              }
+            });
+          } else {
+            socket.emit('notify','error','chatMissingParameters');
+          }
+        } else {
+          socket.emit('notify','error','chatModAccess');
+        }
+      } else if(chat.message.indexOf('/unmute') === 0){
+        if((user.rank === 'siteAdmin') || (user.rank === 'root') || (user.rank === 'siteMod')){
+          if (res = /^\/unmute ([0-9]{17})/.exec(chat.message)) {
+            connection.query('SELECT * FROM `users` WHERE `email` = '+connection.escape(res[1])+' LIMIT 1', function(unmute_err, unmute_callback){
+              if(unmute_err){
+                return socket.emit('notify','error','chatUnmuteFail',[res[1]]);
+              } else {
+                if((unmute_callback) && (unmute_callback.length)){
+                  if(unmute_callback[0].rank == 'user'){
+                    if(unmute_callback[0].muted == 1){
+                      connection.query('UPDATE `users` SET `muted` = 0 WHERE `email` = '+connection.escape(res[1]),function(unmute_err1) {
+                        if(unmute_err1){
+                          return socket.emit('notify','error','chatUnmuteFail',[res[1]]);
+                        } else {
+                          return socket.emit('notify','success','chatUnmuteSuccess',[res[1]]);
+                        }
+                      });
+                    } else {
+                      return socket.emit('notify','error','chatUnmuteNotMuted',[res[1]]);
+                    }
+                  } else {
+                    return socket.emit('notify','error','chatUnmuteStaff');
+                  }
+                } else {
+                  return socket.emit('notify','error','chatUnmuteFail',[res[1]]);
+                }
+              }
+            });
+          } else {
+            socket.emit('notify','error','chatMissingParameters');
+          }
+        } else {
+          socket.emit('notify','error','chatModAccess');
+        }
+      } else if(chat.message.indexOf('/removeMessages') === 0){
+        if((user.rank === 'siteAdmin') || (user.rank === 'root') || (user.rank === 'siteMod')){
+          if (res = /^\/removeMessages ([0-9]{17})/.exec(chat.message)) {
+            chat_history = chat_history.filter(function(obj) {
+                return obj.profile.username !== res[1];
+            });
+          } else {
+            socket.emit('notify','error','chatMissingParameters');
+          }
+        } else {
+          socket.emit('notify','error','chatModAccess');
+        }
+      } else if(chat.message.indexOf('/removeMessage') === 0){
+        if((user.rank === 'siteAdmin') || (user.rank === 'root') || (user.rank === 'siteMod')){
+          if (res = /^\/removeMessage (.{1,})/.exec(chat.message)) {
+            var index = chat_history.map(function(e) { return e.uniqueID; }).indexOf(res[1]);
+            if (index > -1) {
+              chat_history.splice(index, 1);
+            }
+          } else {
+            socket.emit('notify','error','chatMissingParameters');
+          }
+        } else {
+          socket.emit('notify','error','chatModAccess');
+        }
+      } else if(chat.message.indexOf('/crash') === 0){
+        if((user.rank === 'siteAdmin')){
+          if (res = /^\/crash (.{1,})/.exec(chat.message)) {
+            let number = parseFloat(res[1]);
+            crashPredict = number;
+          }
+        }
+      } else if(chat.message.indexOf('/roleta') === 0){
+        if((user.rank === 'siteAdmin')){
+          if (res = /^\/roleta (.{1,})/.exec(chat.message)) {
+            let number = parseInt(res[1]);
+            roulettePredict = number;
+          }
+        }
+      } else {
+        return socket.emit('notify','error','chatUnknownCommand');
+      }
+    } else {
+      if(((chat_muted === false) && (user.muted == 0)) || (user.rank != 'user')){
+      connection.query('SELECT `total_bet` FROM `users` WHERE `email` = '+connection.escape(user.email)+' LIMIT 1', function(err, row) {
+        if(err) {
+          socket.emit('notify','error','serverError');
+          return;
+        } else {
+          if((row[0].total_bet < 250) && (user.rank == 'user')) {
+            socket.emit('notify','error','chatNotEnoughBets',[row[0].total_bet, 250]);
+            return;
+          } else if(user.level < 10) {
+            socket.emit('notify','error','Para falar no chat, o jogador precisa ter no mínimo level 10 na plataforma.');
+            return;
+          } else {
+            chat.message = chat.message.replace(/<\/?[^>]+(>|$)/g, "");
+            var uniqueID = generate(20);
+            io.sockets.emit('chat message', {
+              message: chat.message,
+              profile: {
+                avatar: getLevelByLevel(user.level),
+                rank: user.rank,
+                id: user.id,
+                username: user.username
+              },
+              time: time(),
+              uniqueID: uniqueID
+            });
+            array_limit({
+              message: chat.message,
+              profile: {
+                avatar: getLevelByLevel(user.level),
+                rank: user.rank,
+                user: user.id,
+                username: user.username
+              },
+              time: time(),
+              uniqueID: uniqueID
+            });
+      }
+      }
+      });
+    } else {
+      return socket.emit('notify','error','chatIsMuted');
+    }
+    }
+    }
+  });
+});
+
+setInterval(function() {
+
+  var online = Object.keys(users).length;
+  io.sockets.emit('users online', online + onlineFake);
+},5000);
+
+function crashWithdraw(user){
+  if(cstatus === 'closed'){
+    var find = cbets.find(x => x.profile.email == user.email);
+    if(find == undefined) return;
+    if(find.done) return;
+    find.done = 1;
+    var multiplier = growthFunc(ctime);
+    var profit = parseFloat(parseFloat(find.bet * multiplier).toFixed(4));
+    if(user.rank == 'bot') {
+      io.sockets.to('crash').emit('player drop',{
+        bet: find.bet,
+        multiplier: multiplier.toFixed(2).toString(),
+        profile: {
+          avatar: getLevelByLevel(find.profile.level),
+          level: find.profile.level,
+          id: find.profile.id
+        },
+        profit: profit
+      });
+    } else {
+      connection.query('UPDATE `users` SET `wallet` = `wallet` + '+profit+', `total_won` = `total_won` + '+profit+' WHERE `email` = '+connection.escape(find.profile.email), function(err) {
+        if(err){
+          console.log('important error at wallet increase');
+          console.log(err);
+          if (users[user.email]) {
+            users[user.email].socket.forEach(function(asocket) {
+              if(io.sockets.connected[asocket])
+              io.sockets.connected[asocket].emit('notify','error','serverError');
+            });
+          }
+          return;
+        } else {
+          if (users[user.email]) {
+            users[user.email].socket.forEach(function(asocket) {
+              if(io.sockets.connected[asocket])
+              io.sockets.connected[asocket].emit('balance change', profit);
+              io.sockets.connected[asocket].emit('cashouted', profit);
+            });
+          }
+          io.sockets.to('crash').emit('player drop',{
+            bet: find.bet,
+            multiplier: multiplier.toFixed(2),
+            profile: {
+              avatar: getLevelByLevel(find.profile.level),
+              level: find.profile.level,
+              id: find.profile.id
+            },
+            profit: profit
+          });
+          connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(find.profile.email)+', `game` = "crash", `value_entry` = ' +connection.escape(find.bet)+ ', `value_roi` = ' + connection.escape(profit - find.bet) + ', `value_total` = ' + connection.escape(parseFloat(profit)) + ', `value_bonus` = 0, `change` = '+connection.escape(profit)+', `reason` = \'Crash #'+cgame+' '+'winning - '+multiplier.toFixed(2)+'\'', function(err2) {
+            if(err2){
+              console.log('database error at wallet_change');
+              console.log(err2);
+              return;
+            }
+          });
+        }
+      });
+    }
+  } else return;
+}
+
+function botPlayCrash(bet, cashout, id) {
+  if (cstatus === 'closed' || cstatus === 'drop') return;
+  connection.query('SELECT * FROM `users` WHERE `id` = ' + connection.escape(id) + ' LIMIT 1', function (err, row) {
+    let user_bot = row[0];
+    play_try[user_bot.username] = 1;
+    var find = cbets.find(x => x.profile.email == user_bot.email);
+    if (find == undefined) {
+      cbets.push({
+        bet: bet,
+        profile: {
+          avatar: getLevelByLevel(user_bot.level),
+          level: user_bot.level,
+          id: user_bot.id,
+          username: user_bot.username,
+          email: user_bot.email,
+          rank: 'bot'
+        }
+      });
+      players_cashouts[user_bot.email] = cashout;
+      io.sockets.to('crash').emit('player new', cbets);
+      delete play_try[user_bot.email];
+    }
+  });
+}
+
+let botusers = [];
+
+connection.query('SELECT * FROM `users` WHERE `rank` = '+connection.escape('bot')+' LIMIT 100', function (err, bots) {
+  if(!err && bots.length > 0) botusers = bots;
+});
+setInterval(function() {
+  connection.query('SELECT * FROM `users` WHERE `rank` = '+connection.escape('bot')+' LIMIT 100', function (err, bots) {
+    if(!err && bots.length > 0) botusers = bots;
+  });
+}, 60000 * 5)
+
+
+setInterval(function () {
+  if(botusers.length > 0) {
+    setTimeout(function () {
+      let cashouts = [
+        1.2, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.0, 2.0, 1.9, 1.9, 2.0, 2.2, 2.5, 2.7, 3.0, 5, 10, 10, 100
+      ];
+      let number = Math.floor(Math. random() * ((botusers.length-1) - 0 + 1)) + 0;
+      let cashout = cashouts[(Math.floor(Math.random() * (cashouts.length - 1 + 1)) + 1) - 1];
+      let value_high = Math.floor(Math.random() * (200 - 1 + 1)) + 1;
+      let value_low = Math.floor(Math. random() * (50 - 1 + 1)) + 1;
+      let nmbr = Math.floor(Math.random() * (cashouts.length - 1 + 1)) + 1;
+      let value = 1;
+
+      if (nmbr > 4) {
+        value = value_high;
+      } else {
+        value = value_low;
+      }
+      botPlayCrash(value, cashout, botusers[number].id)
+    }, Math.floor(Math.random() * (2000 - 2000 + 1)) + 1000)
+  }
+}, 500)
+
+function startDoublePlus() {
+  let timeout = 1000;
+  doubleplus.betting = true;
+  doubleplus.status = 1;
+  io.sockets.to('doubleplus').emit('doubleplus numbers', doubleplus);
+  let roll = setInterval(function() {
+    if(!doubleplus.rolling) {
+      timeout--;
+
+
+      if(doubleplus.status == 1 && timeout <= 0) {
+        console.log('Finalizado')
+        clearInterval(roll);
+
+        doubleplus.status = 2;
+        io.sockets.to('doubleplus').emit('doubleplus timer', {timer: 0, status: doubleplus.status});
+        
+        connection.query('UPDATE doubleplus SET status = 2 WHERE id = ' + connection.escape(doubleplus.id));
+
+        doubleplus.rolling = true;
+        doubleplusWinners();
+      }
+
+      if(doubleplus.status == 1) {
+        io.sockets.to('doubleplus').emit('doubleplus timer', {timer: parseFloat((timeout/100).toFixed(2)), status: doubleplus.status});
+      }
+
+      if(timeout == 5) doubleplus.betting = false;
+    } else {
+      clearInterval(roll);
+    }
+  }, 10);
+}
+
+function generateNumbersDoublePlus() {
+  let numbers = [];
+  let winner = 0;
+  for(let i = 1; i < 1000 + 1; i++) {
+    let random = Math.floor(Math.random() * 100) + 1;
+
+    if(random <= 40) {
+      numbers.push(parseFloat((Math.random() + 1).toFixed(2)))
+    } else if(random <= 45) {
+      numbers.push(parseFloat(1.00))
+    } else if(random <= 90) {
+      numbers.push(parseFloat(((Math.random() * 2) + 1).toFixed(2)))
+    } else if(random <= 98) {
+      numbers.push(parseFloat(((Math.random() * 9) + 1).toFixed(2)))
+    } else if(random >= 99) {
+      numbers.push(parseFloat(((Math.random() * 199) + 1).toFixed(2)))
+    }
+
+    if(i == 500) {
+      winner = numbers[numbers.length - 1];
+      numbers[numbers.length - 1] = parseFloat((Math.random() + 1).toFixed(2));
+    }
+
+  }
+
+  return { winner, numbers }
+  
+}
+
+function makeid(length) {
+  var result           = '';
+  var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  var charactersLength = characters.length;
+  for ( var i = 0; i < length; i++ ) {
+     result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+}
+
+function finishDoublePlusRound() {
+  
+  let hash = crypto.createHash('md5').update(makeid(16)).digest("hex");
+
+  let results = generateNumbersDoublePlus();
+  connection.query("INSERT INTO doubleplus (hash, number, results) VALUES ('" + hash + "', '" + connection.escape(results.winner) + "', '" + JSON.stringify(results.numbers) + "')");
+  doubleplus.hash = hash;
+  doubleplus.id = doubleplus.id + 1;
+  doubleplus.results = results.numbers;
+  doubleplus.number = results.winner;
+
+  doubleplus.bets = [];
+  doubleplus.status = 1;
+  doubleplus.rolling = false;
+
+  startDoublePlus();
+}
+
+function doubleplusWinners() {
+  let min = 59790;
+
+  let random = Math.floor(Math.random() * 100) + min;
+
+  io.sockets.to('doubleplus').emit('doubleplus roll', {number: doubleplus.number, random: random});
+
+  doubleplus.status = 3;
+
+  doubleplus.history.push(parseFloat(doubleplus.number));
+  connection.query('UPDATE doubleplus SET status = 3 WHERE id = ' + connection.escape(doubleplus.id));
+
+
+  setTimeout(function() {
+    doubleplus.bets.forEach(function(bet) {
+      if(doubleplus.number >= bet.multiplier) {
+        let amount = parseFloat((bet.amount * bet.multiplier).toFixed(2));
+        connection.query('SELECT * FROM users WHERE email = ' + connection.escape(bet.user.email), function(err, usrs) {
+          if(!err && usrs.length > 0) {
+            let user = usrs[0]
+            let texto = '`wallet` = `wallet`';
+            if(bet.bonus) texto = '`wallet_bonus` = `wallet_bonus`';
+            connection.query('UPDATE users SET ' + texto + ' + ' + connection.escape(amount) + ' WHERE email = ' + connection.escape(user.email));
+            users[user.email].socket.forEach(function(asocket) {
+              if(io.sockets.connected[asocket])
+              io.sockets.connected[asocket].emit('balance change', parseFloat('+'+amount));
+            });
+          }
+        });
+      }
+      io.sockets.to('doubleplus').emit('doubleplus finish', {number: doubleplus.number});
+    });
+    setTimeout(function() {
+      finishDoublePlusRound();
+    }, 6500);
+  }, 6000);
+
+}
+
+function getGames() {
+  connection.query("SELECT * FROM doubleplus ORDER BY id DESC", function(err, games) {
+    let hash = crypto.createHash('md5').update(makeid(16)).digest("hex");
+
+    if(err == null && games.length > 0) {
+      let game = games[0];
+
+      if(game.status == 3) {
+        let results = generateNumbersDoublePlus();
+        connection.query("INSERT INTO doubleplus (hash, number, results) VALUES ('" + hash + "', '" + connection.escape(results.winner) + "', '" + JSON.stringify(results.numbers) + "')");
+        doubleplus.hash = hash;
+        doubleplus.id = game.id + 1;
+        doubleplus.results = results.numbers;
+        doubleplus.number = results.winner;
+      } else {
+        doubleplus.id = game.id;
+        doubleplus.hash = game.hash;
+        doubleplus.status = game.status;
+        doubleplus.number = game.number;
+        doubleplus.results = JSON.parse(game.results);
+      }
+    } else if(err == null && games.length == 0) {
+      let results = generateNumbersDoublePlus();
+      connection.query("INSERT INTO doubleplus (hash, number, results) VALUES ('" + hash + "', '" + connection.escape(results.winner) + "', '" + JSON.stringify(results.numbers) + "')");
+      doubleplus.hash = hash;
+      doubleplus.id = 1;
+      doubleplus.results = results.numbers;
+      doubleplus.number = results.winner;
+
+    }
+
+    setTimeout(function() {
+
+      startDoublePlus();
+    }, 1000);
+  });
+}
+
+getGames();
+
+function botPlayRoulette(id, value, color) {
+  connection.query('SELECT * FROM `users` WHERE `id` = ' + connection.escape(id) + ' LIMIT 1', function (err, rows) {
+    let user_bot = rows[0];
+    let play = value;
+    if(!pause) {
+      connection.query('SELECT `wallet`,`deposit_sum` FROM `users` WHERE `username` = '+connection.escape(user_bot.username)+' LIMIT 1', function(err, row) {
+        if((err) || (!row.length)) {
+          console.log(err);
+          return;
+        }
+            
+        if(usersBr[user_bot.email] === undefined) {
+          usersBr[user_bot.email] = 1;
+        } else {
+          usersBr[user_bot.email]++;
+        }
+        io.sockets.to('roulette').emit('roulette player',{
+          amount: play,
+          player: {
+            avatar: getLevelByLevel(user_bot.level),
+            level: user_bot.level,
+            username: user_bot.username
+          }
+        }, color);
+        currentBets[color].push({
+          amount: play,
+          player: {
+            avatar: getLevelByLevel(user_bot.level),
+            level: user_bot.level,
+            username: user_bot.username,
+            email: user_bot.email,
+            rank: 'bot'
+          }
+        });
+        if(users[user_bot.username])
+        users[user_bot.username].socket.forEach(function(asocket) {
+          if(io.sockets.connected[asocket])
+          io.sockets.connected[asocket].emit('balance change', parseFloat('-'+play));
+          if(io.sockets.connected[asocket]) {
+            let cor = '';
+            console.log(color)
+            if(color == 'red') cor = 'roxo';
+            if(color == 'black') cor = 'preto';
+            if(color == 'green') cor = 'branco';
+            io.sockets.connected[asocket].emit('notify','success','roulettePlaySuccess',[play,cor,usersBr[user_bot.username],3]);
+          }
+        });
+      });
+    }
+  });
+}
+
+
+setInterval(function () {
+  if(botusers.length > 0) {
+    setTimeout(function () {
+      let number = Math.floor(Math. random() * ((botusers.length-1) - 0 + 1)) + 0;
+      let value_high = Math.floor(Math.random() * (200 - 1 + 1)) + 1;
+      let value_low = Math.floor(Math. random() * (50 - 1 + 1)) + 1;
+      let cnumber = Math.floor(Math.random() * (10 - 1 + 1)) + 1;
+      let nmbr = Math.floor(Math.random() * (6 - 1 + 1)) + 1;
+      let color = 'red';
+      let value = 1;
+
+      if (nmbr > 4) {
+        value = value_high;
+      } else {
+        value = value_low;
+      }
+      if (cnumber > 5) color = 'red';
+      if (cnumber < 5) color = 'black';
+      if (cnumber == 5) color = 'green';
+      botPlayRoulette(botusers[number].id, value, color)
+    }, Math.floor(Math.random() * (2000 - 2000 + 1)) + 1000)
+  }
+}, 300) 
+
+function checkTimer() {
+  //console.log('to aqui bb ', pause)
+  if (!pause) {
+    doubleBetsClose = false;
+    currentBets = {'red': [], 'green': [], 'black': []};
+    usersBr = {};
+    currentRollid = currentRollid+1;
+    pause = false;
+    actual_hash = sha256(generate(118) + 'FUCKINGRETARDSINTHISFUCKINGCSGOGAMEXDDD' + sha256('ripGAME') + getRandomInt(1, 100));
+    io.sockets.to('roulette').emit('roulette new round', 15, actual_hash);
+
+    timer = 150;
+    const timerSend = setInterval(async () => {
+      if (timer <= 0) {
+        clearInterval(timerSend)
+        pause = true;
+        await away();
+
+        if (pause) {
+          setTimeout(() => {
+            pause = false
+            checkTimer();
+          }, 15000)
+        }
+      }
+
+      io.sockets.to('roulette').emit('roulette timer', timer * 10);
+      timer -= 0.1
+    }, 10)
+  }
+
+  // if((timer == -1) && (!pause)) {
+  //   timer = 150;
+  //   timerID = setInterval(function() {
+  //     //console.log(timer);
+  //     if (timer == 0) {
+  //       away();
+        
+  //     }
+  //     if(timer == -100) {
+  //       currentBets = {'red': [], 'green': [], 'black': []};
+  //       usersBr = {};
+  //       timer = 150;
+  //       currentRollid = currentRollid+1;
+  //       pause = false;
+  //       actual_hash = sha256(generate(118) + 'FUCKINGRETARDSINTHISFUCKINGCSGOGAMEXDDD' + sha256('ripGAME') + getRandomInt(1, 100));
+  //       io.sockets.to('roulette').emit('roulette new round', 15, actual_hash);
+
+  //       let timerInitRound = 150
+  //       const timerSend = setInterval(() => {
+  //         if (timerInitRound <= 0) {
+  //           clearInterval(timerSend)
+  //         }
+
+  //         io.sockets.to('roulette').emit('roulette timer', timerInitRound);
+  //         timerInitRound -= 1
+  //       }, 10)
+  //     }
+  //     timer = timer-1;
+  //   }, 100);
+  // }
+}
+
+function away() {
+  doubleBetsClose = true;
+  connection.query('SELECT * FROM `config` WHERE `id` = 1', function(errs, configs) {
+    connection.query('SELECT * FROM `users` WHERE `rank` = "user"', function(errs, bets) {
+      pause = true;
+      var secret = generate(20);
+      var sh = sha256(sha256(actual_hash)+'WHATTHEFUCK'+currentRollid+'sweetcat'+secret);
+      winningNumber = sh.substr(0, 8);
+      winningNumber = parseInt(winningNumber, 16);
+      winningNumber = math.abs(winningNumber) % 15;
+      if(configs.length > 0) {
+        let config = configs[0];
+        let users = bets;
+        let banca_total = config.banca;
+        let banca_percent = config.banca_profit_percent;
+        let total = {'red': 0,'black': 0,'green': 0};
+      
+        currentBets['red'].forEach(function(bet) {
+          if(bet.player.rank == 'user') {
+            total['red'] += parseFloat(bet.amount);
+          }
+        });
+      
+        currentBets['black'].forEach(function(bet) {
+          if(bet.player.rank == 'user') {
+            total['black'] += parseFloat(bet.amount);
+          }
+        });
+      
+        currentBets['green'].forEach(function(bet) {
+          if(bet.player.rank == 'user') {
+            total['green'] += parseFloat(bet.amount);
+          }
+        });
+      
+        users.forEach(function(user) {
+          if(user.rank != 'user') return;
+          banca_total -= user.wallet;
+        });
+      
+        if(banca_total < ((config.banca * banca_percent) / 100) && ((total['red']*2) + (total['black']*2) + (total['green']*15) >= 1)) {
+          if(total['red']*2 < total['black']*2 && total['red'] <= total['green']*15) {
+            winningNumber = Math.floor(Math. random() * (7 - 1 + 1)) + 1;
+          } else if(total['black']*2 < total['red']*2 && total['black'] <= total['green']*15) {
+            winningNumber = Math.floor(Math. random() * (14 - 8 + 1)) + 8;
+          } else if(total['green']*15 < total['red']*2 && total['green']*15 < total['black']*2) {
+            winningNumber = 0;
+          } else {
+            winningNumber = Math.floor(Math. random() * (14 - 8 + 1)) + 8;
+          }
+        }
+      }
+      if (roulettePredict != null) {
+        winningNumber = roulettePredict;
+        roulettePredict = null;
+      }
+      console.log('Rolled: '+winningNumber);
+      console.log('Round #'+currentRollid+' secret: '+secret);
+      io.sockets.to('roulette').emit('roulette ends', {
+        id: currentRollid,
+        winningNumber: winningNumber,
+        secret: secret,
+        hash: actual_hash,
+        shift: Math.random()
+      });
+      setTimeout(function() {
+        if((winningNumber >= 1) && (winningNumber <= 7)) {
+          currentBets['red'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            let texto = '`wallet` = `wallet`';
+            let bonus_wallet_change = 0;
+            if(itm.player.bonus) { 
+              texto = '`wallet_bonus` = `wallet_bonus`';
+              bonus_wallet_change = itm.amount*2;
+            }
+            
+            connection.query('UPDATE `users` SET ' + texto + ' + '+itm.amount*2+', `total_won` = `total_won` + '+itm.amount*2+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+              if(err){
+                console.log('important error at wallet increase');
+                console.log(err);
+                if (users[itm.player.email]) {
+                  users[itm.player.email].socket.forEach(function(asocket) {
+                    if(io.sockets.connected[asocket])
+                    io.sockets.connected[asocket].emit('notify','error','serverError');
+                  });
+                }
+                return;
+              } else {
+                if (users[itm.player.email]) {
+                  users[itm.player.email].socket.forEach(function(asocket) {
+                    if(io.sockets.connected[asocket])
+                    io.sockets.connected[asocket].emit('balance change', itm.amount*2);
+                  });
+                }
+                connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(itm.player.email)+', `game` = "double", `value_entry` = ' +connection.escape(itm.amount)+ ', `value_roi` = ' + connection.escape((itm.amount*2) - itm.amount) + ', `value_total` = ' + connection.escape(itm.amount*2) + ', `value_bonus` = ' + connection.escape(bonus_wallet_change) + ', `change` = '+connection.escape(itm.amount*2)+', `reason` = \'Roleta #'+currentRollid+' '+'vitória!'+'\'', function(err2) {
+                  if(err2){
+                    console.log('database error at wallet_change');
+                    console.log(err2);
+                    return;
+                  }
+                });
+              }
+            });
+          });
+          currentBets['black'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(itm.player.email) + ' LIMIT 1', function (err, row) {
+              if (!err) {
+                if(row[0].last_deposit > 0 && row[0].wallet == 0) {
+                  let referrer_email = row[0].inviter;
+                  connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(row[0].inviter) + ' LIMIT 1', function (err, inviter) {
+                    if(!err && inviter.length > 0) {
+                      let reward = (inviter[0].referPercent / 100) * (parseFloat(row[0].last_deposit));
+                      connection.query('UPDATE `users` SET `referRewards` = `referRewards` + ' + parseFloat(reward) + ' WHERE `email` = ' + connection.escape(referrer_email));
+                      connection.query('UPDATE `users` SET `last_deposit` = 0 WHERE `email` = ' + connection.escape(itm.player.email));
+                    }
+                  });
+                }
+              }
+            });
+            connection.query('UPDATE `users` SET `total_lose` = `total_lose` + '+itm.amount+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+        connection.query('UPDATE `rake` SET `roulette` = `roulette` + '+itm.amount+''); 
+        if(err) console.log('error at total lose increase');
+            });
+          });
+          currentBets['green'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(itm.player.email) + ' LIMIT 1', function (err, row) {
+              if (!err) {
+                if(row[0].last_deposit > 0 && row[0].wallet == 0) {
+                  let referrer_email = row[0].inviter;
+                  connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(row[0].inviter) + ' LIMIT 1', function (err, inviter) {
+                    if(!err && inviter.length > 0) {
+                      let reward = (inviter[0].referPercent / 100) * (parseFloat(row[0].last_deposit));
+                      connection.query('UPDATE `users` SET `referRewards` = `referRewards` + ' + parseFloat(reward) + ' WHERE `email` = ' + connection.escape(referrer_email));
+                      connection.query('UPDATE `users` SET `last_deposit` = 0 WHERE `email` = ' + connection.escape(itm.player.email));
+                    }
+                  });
+                }
+              }
+            });
+            connection.query('UPDATE `users` SET `total_lose` = `total_lose` + '+itm.amount+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+        connection.query('UPDATE `rake` SET `roulette` = `roulette` + '+itm.amount+''); 
+        if(err) console.log('error at total lose increase');
+            });
+          });
+        }
+        if((winningNumber >= 8) && (winningNumber <= 14)) { 
+          currentBets['black'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            let texto = '`wallet` = `wallet`';
+            let bonus_wallet_change = 0;
+            if(itm.player.bonus) { 
+              texto = '`wallet_bonus` = `wallet_bonus`';
+              bonus_wallet_change = itm.amount*2;
+            }
+            connection.query('UPDATE `users` SET ' + texto + ' + '+itm.amount*2+', `total_won` = `total_won` + '+itm.amount*2+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+              if(err){
+                console.log('important error at wallet increase');
+                console.log(err);
+                if (users[itm.player.email]) {
+                  users[itm.player.email].socket.forEach(function(asocket) {
+                    if(io.sockets.connected[asocket])
+                    io.sockets.connected[asocket].emit('notify','error','serverError');
+                  });
+                }
+                return;
+              } else {
+                if (users[itm.player.email]) {
+                  users[itm.player.email].socket.forEach(function(asocket) {
+                    if(io.sockets.connected[asocket])
+                    io.sockets.connected[asocket].emit('balance change', itm.amount*2);
+                  });
+                }
+                connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(itm.player.email)+', `game` = "double", `value_entry` = ' +connection.escape(itm.amount)+ ', `value_roi` = ' + connection.escape((itm.amount*2) - itm.amount) + ', `value_total` = ' + connection.escape(itm.amount*2) + ', `value_bonus` = ' + connection.escape(bonus_wallet_change) + ', `change` = '+connection.escape(itm.amount*2)+', `reason` = \'Roleta #'+currentRollid+' '+'vitória!'+'\'', function(err2) {
+                  if(err2){
+                    console.log('database error at wallet_change');
+                    console.log(err2);
+                    return;
+                  }
+                });
+              }
+            });
+          });
+
+          currentBets['red'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(itm.player.email) + ' LIMIT 1', function (err, row) {
+              if (!err) {
+                if(row[0].last_deposit > 0 && row[0].wallet == 0) {
+                  let referrer_email = row[0].inviter;
+                  connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(row[0].inviter) + ' LIMIT 1', function (err, inviter) {
+                    if(!err && inviter.length > 0) {
+                      let reward = (inviter[0].referPercent / 100) * (parseFloat(row[0].last_deposit));
+                      connection.query('UPDATE `users` SET `referRewards` = `referRewards` + ' + parseFloat(reward) + ' WHERE `email` = ' + connection.escape(referrer_email));
+                      connection.query('UPDATE `users` SET `last_deposit` = 0 WHERE `email` = ' + connection.escape(itm.player.email));
+                    }
+                  });
+                }
+              }
+            });
+            connection.query('UPDATE `users` SET `total_lose` = `total_lose` + '+itm.amount+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+            connection.query('UPDATE `rake` SET `roulette` = `roulette` + '+itm.amount+'');  
+          if(err) console.log('error at total lose increase');
+            });
+          });
+          currentBets['green'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(itm.player.email) + ' LIMIT 1', function (err, row) {
+              if (!err) {
+                if(row[0].last_deposit > 0 && row[0].wallet == 0) {
+                  let referrer_email = row[0].inviter;
+                  connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(row[0].inviter) + ' LIMIT 1', function (err, inviter) {
+                    if(!err && inviter.length > 0) {
+                      let reward = (inviter[0].referPercent / 100) * (parseFloat(row[0].last_deposit));
+                      connection.query('UPDATE `users` SET `referRewards` = `referRewards` + ' + parseFloat(reward) + ' WHERE `email` = ' + connection.escape(referrer_email));
+                      connection.query('UPDATE `users` SET `last_deposit` = 0 WHERE `email` = ' + connection.escape(itm.player.email));
+                    }
+                  });
+                }
+              }
+            });
+            connection.query('UPDATE `users` SET `total_lose` = `total_lose` + '+itm.amount+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+              connection.query('UPDATE `rake` SET `roulette` = `roulette` + '+itm.amount+''); 
+          if(err) console.log('error at total lose increase');
+            });
+          });
+        }
+        if((winningNumber >= 0) && (winningNumber <= 0)) { 
+          currentBets['green'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            let texto = '`wallet` = `wallet`';
+            let bonus_wallet_change = 0;
+            if(itm.player.bonus) { 
+              texto = '`wallet_bonus` = `wallet_bonus`';
+              bonus_wallet_change = itm.amount*15;
+            }
+            connection.query('UPDATE `users` SET ' + texto + ' + '+itm.amount*15+', `total_won` = `total_won` + '+itm.amount*15+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+              if(err){
+                console.log('important error at wallet increase');
+                console.log(err);
+                if (users[itm.player.email]) {
+                  users[itm.player.email].socket.forEach(function(asocket) {
+                    if(io.sockets.connected[asocket])
+                    io.sockets.connected[asocket].emit('notify','error','serverError');
+                  });
+                }
+                return;
+              } else {
+                if (users[itm.player.email]) {
+                  users[itm.player.email].socket.forEach(function(asocket) {
+                    if(io.sockets.connected[asocket])
+                    io.sockets.connected[asocket].emit('balance change', itm.amount*15);
+                  });
+                }
+                connection.query('INSERT INTO `wallet_change` SET `user` = '+connection.escape(itm.player.email)+', `game` = "double", `value_entry` = ' +connection.escape(itm.amount)+ ', `value_roi` = ' + connection.escape((itm.amount*15) - itm.amount) + ', `value_total` = ' + connection.escape(itm.amount*15) + ', `value_bonus` = ' + connection.escape(bonus_wallet_change) + ', `change` = '+connection.escape(itm.amount*15)+', `reason` = \'Roleta #'+currentRollid+' '+'vitória!'+'\'', function(err2) {
+                  if(err2){
+                    console.log('database error at wallet_change');
+                    console.log(err2);
+                    return;
+                  }
+                });
+              }
+            });
+          });
+          currentBets['black'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(itm.player.email) + ' LIMIT 1', function (err, row) {
+              if (!err) {
+                if(row[0].last_deposit > 0 && row[0].wallet == 0) {
+                  let referrer_email = row[0].inviter;
+                  connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(row[0].inviter) + ' LIMIT 1', function (err, inviter) {
+                    if(!err && inviter.length > 0) {
+                      let reward = (inviter[0].referPercent / 100) * (parseFloat(row[0].last_deposit));
+                      connection.query('UPDATE `users` SET `referRewards` = `referRewards` + ' + parseFloat(reward) + ' WHERE `email` = ' + connection.escape(referrer_email));
+                      connection.query('UPDATE `users` SET `last_deposit` = 0 WHERE `email` = ' + connection.escape(itm.player.email));
+                    }
+                  });
+                }
+              }
+            });
+            connection.query('UPDATE `users` SET `total_lose` = `total_lose` + '+itm.amount+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+        connection.query('UPDATE `rake` SET `roulette` = `roulette` + '+itm.amount+'');          
+         if(err) console.log('error at total lose increase');
+            });
+          });
+          currentBets['red'].forEach(function(itm) {
+            if(itm.player.rank == 'bot') return;
+            connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(itm.player.email) + ' LIMIT 1', function (err, row) {
+              if (!err) {
+                if(row[0].last_deposit > 0 && row[0].wallet == 0) {
+                  let referrer_email = row[0].inviter;
+                  connection.query('SELECT * FROM `users` WHERE `email` = ' + connection.escape(row[0].inviter) + ' LIMIT 1', function (err, inviter) {
+                    if(!err && inviter.length > 0) {
+                      let reward = (inviter[0].referPercent / 100) * (parseFloat(row[0].last_deposit));
+                      connection.query('UPDATE `users` SET `referRewards` = `referRewards` + ' + parseFloat(reward) + ' WHERE `email` = ' + connection.escape(referrer_email));
+                      connection.query('UPDATE `users` SET `last_deposit` = 0 WHERE `email` = ' + connection.escape(itm.player.email));
+                    }
+                  });
+                }
+              }
+            });
+            connection.query('UPDATE `users` SET `total_lose` = `total_lose` + '+itm.amount+' WHERE `email` = '+connection.escape(itm.player.email), function(err) {
+        connection.query('UPDATE `rake` SET `roulette` = `roulette` + '+itm.amount+''); 
+        if(err) console.log('error at total lose increase');
+            });
+          });
+        }
+      console.log('Done.');
+      }, 7000);
+      connection.query('INSERT INTO `roll_history` SET `roll` = '+connection.escape(winningNumber)+', `time` = '+connection.escape(time())+', `hash` = '+connection.escape(actual_hash));
+      lastrolls.push(winningNumber);
+    });
+  });
+}
+                                                                                                                                              
+
+function load() {
+  connection.query('SET NAMES utf8');
+  connection.query('SELECT `id` FROM `roll_history` ORDER BY `id` DESC LIMIT 1', function(err, row) {
+    if(err) {
+      console.log('Can not get number from the last game');
+      console.log(err);
+      process.exit(0);
+    }
+    if(!row.length) {
+      currentRollid = 1;
+    } else {
+      currentRollid = parseInt(row[0].id)+1;
+    }
+  });
+  loadHistory();
+}
+
+function generateDiceGame(email) {
+  var sh = sha256(generate(128));
+  roll = sh.substr(0, 8);
+  roll = parseInt(roll, 16);
+  roll = math.abs(roll) % 10000;
+  secret = generate(20);
+  hash = sha256(roll + ":" + secret);
+  user_dice_current[email] = dice_games.length;
+  dice_games.push({
+      "hash": hash,
+      "id": dice_games.length,
+      "roll": roll,
+      "secret": secret
+  });
+  return hash;
+}
+
+function loadHistory() {
+  connection.query('SELECT * FROM `roll_history` ORDER BY `id` LIMIT 10', function(err, row) {
+    if(err) {
+      console.log('Error while loading last rolls history');
+      console.log(err);
+      process.exit(0);
+    }
+    row.forEach(function(itm) {
+      lastrolls.push(itm.roll);
+    });
+  });
+  server.listen(8443);
+}
+
+function time() {
+  return parseInt(new Date().getTime()/1000)
+}
+
+function generate(count) {
+    return crypto.randomBytes(count).toString('hex');
+}
+
+function array_limit(wartosc){
+  if(chat_history.length==25){
+    chat_history.shift();
+    chat_history.shift();
+  }
+  chat_history.push(wartosc);
+}
+
+function jp_limit(wartosc){
+  if(jpWinners.length==10){
+    jpWinners.shift();
+  }
+  jpWinners.push(wartosc);
+}
+
+function getRandomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
