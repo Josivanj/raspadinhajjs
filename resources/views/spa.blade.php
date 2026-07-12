@@ -1,315 +1,121 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BG Games</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ config('app.name', 'Raspadinha') }}</title>
+    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <style>
+        :root { --gold:#f4b942; --green:#12c985; --panel:#161a24; --muted:#99a1b3; }
+        * { box-sizing:border-box; }
+        body { margin:0; color:#fff; background:#080a0f; font-family:Inter,Arial,sans-serif; }
+        header { position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between; padding:16px max(20px,5vw); background:rgba(8,10,15,.94); border-bottom:1px solid #252a36; backdrop-filter:blur(12px); }
+        .brand { display:flex; align-items:center; gap:10px; font-size:22px; font-weight:900; color:var(--gold); }
+        .brand span { width:38px; height:38px; display:grid; place-items:center; border-radius:12px; color:#111; background:linear-gradient(135deg,#ffd56a,#e49317); }
+        nav { display:flex; gap:10px; }
+        button,.button { border:0; border-radius:10px; padding:11px 18px; font-weight:800; cursor:pointer; text-decoration:none; color:#fff; background:#252b38; }
+        .primary { color:#07130f; background:var(--green); }
+        .hero { min-height:390px; display:flex; align-items:center; padding:55px max(20px,7vw); background:radial-gradient(circle at 80% 20%,rgba(244,185,66,.25),transparent 35%),linear-gradient(120deg,#111725,#090b11); }
+        .hero-copy { max-width:650px; }
+        h1 { margin:0 0 18px; font-size:clamp(38px,7vw,76px); line-height:.98; }
+        h1 em { color:var(--gold); font-style:normal; }
+        .hero p { max-width:560px; color:#c5cad5; font-size:18px; line-height:1.6; }
+        .hero-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:28px; }
+        main { padding:36px max(20px,5vw) 70px; }
+        .section-title { display:flex; align-items:end; justify-content:space-between; margin-bottom:20px; }
+        h2 { margin:0; font-size:28px; }
+        .section-title small { color:var(--muted); }
+        .games { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:18px; }
+        .game { overflow:hidden; border:1px solid #252a36; border-radius:16px; background:var(--panel); transition:.2s; }
+        .game:hover { transform:translateY(-5px); border-color:var(--gold); }
+        .game img { display:block; width:100%; aspect-ratio:1/1; object-fit:cover; background:#222834; }
+        .game div { padding:14px; }
+        .game strong { display:block; margin-bottom:5px; }
+        .game small { color:var(--muted); }
+        footer { padding:25px; text-align:center; color:#737b8d; border-top:1px solid #20242f; }
+        dialog { width:min(92vw,420px); color:#fff; border:1px solid #343b4b; border-radius:18px; background:#151923; }
+        dialog::backdrop { background:rgba(0,0,0,.75); }
+        dialog form { display:grid; gap:13px; }
+        input { width:100%; padding:13px; color:#fff; border:1px solid #343b4b; border-radius:9px; outline:none; background:#0c0f15; }
+        .dialog-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+        .dialog-head h3 { margin:0; }
+        .close { padding:7px 11px; }
+        #message { min-height:20px; color:#ff7777; font-size:14px; }
+        @media(max-width:600px){ header{padding:12px 16px}.brand{font-size:17px}.hero{min-height:330px;padding:45px 20px}nav .button{display:none} }
+    </style>
 </head>
 <body>
-    <div id="app"></div>
-    
-    <!-- Indicador do Sistema de Distribuição -->
-    <div id="distribution-indicator" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 8px 12px; background: rgba(0,0,0,0.8); color: white; border-radius: 8px; font-family: Arial, sans-serif; font-size: 12px; min-width: 150px; backdrop-filter: blur(10px);">
-        <div style="display: flex; align-items: center;">
-            <span id="mode-icon" style="margin-right: 8px; font-size: 16px;">💰</span>
-            <div>
-                <div id="mode-title" style="font-weight: bold;">Arrecadação</div>
-                <div id="mode-progress" style="opacity: 0.8; font-size: 10px;">0%</div>
-            </div>
-        </div>
-        <div id="last-update" style="text-align: center; margin-top: 4px; font-size: 10px; opacity: 0.6;"></div>
-        <div id="auto-status" style="text-align: center; margin-top: 2px; font-size: 9px; color: #10b981;">🔄 AUTO</div>
-    </div>
+<header>
+    <div class="brand"><span>★</span>{{ config('app.name', 'Raspadinha') }}</div>
+    <nav>
+        <a class="button" href="#jogos">Jogos</a>
+        <button onclick="loginModal.showModal()">Entrar</button>
+        <button class="primary" onclick="registerModal.showModal()">Criar conta</button>
+    </nav>
+</header>
 
-    <!-- Botão de Teste Manual (apenas para debug) -->
-    <div id="test-button" style="display: none; position: fixed; top: 80px; right: 20px; z-index: 9999;">
-        <button onclick="testManual()" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;">
-            🧪 Teste Manual
-        </button>
-        <button onclick="testForce()" style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-top: 5px;">
-            🔥 Forçar Processamento
-        </button>
-        <div id="auto-status-indicator" style="background: #1f2937; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; margin-top: 5px; text-align: center;">
-            ⏰ Aguardando...
+<section class="hero">
+    <div class="hero-copy">
+        <h1>Raspe, jogue e <em>concorra!</em></h1>
+        <p>Entre na diversão com raspadinhas e jogos rápidos. Crie sua conta para acessar a plataforma.</p>
+        <div class="hero-actions">
+            <button class="primary" onclick="registerModal.showModal()">Começar agora</button>
+            <a class="button" href="#jogos">Ver jogos</a>
         </div>
     </div>
-    
-    <!-- Sistema de Distribuição Automático -->
-    <script>
-        // Automação do Sistema de Distribuição
-        let distributionInterval = null;
-        let lastUpdateTime = null;
-        let timeUpdateInterval = null;
-        let autoCounter = 0;
-        
-        function updateIndicator(data) {
-            console.log('🎯 Atualizando indicador visual com dados:', data);
-            
-            const indicator = document.getElementById('distribution-indicator');
-            const modeIcon = document.getElementById('mode-icon');
-            const modeTitle = document.getElementById('mode-title');
-            const modeProgress = document.getElementById('mode-progress');
-            const lastUpdate = document.getElementById('last-update');
-            const autoStatus = document.getElementById('auto-status');
-            
-            if (data.status === 'processed') {
-                // Mostra o indicador
-                indicator.style.display = 'block';
-                
-                // Atualiza ícone e título
-                if (data.modo === 'arrecadacao') {
-                    modeIcon.textContent = '💰';
-                    modeTitle.textContent = 'Arrecadação';
-                    indicator.style.borderLeft = '4px solid #ef4444';
-                } else {
-                    modeIcon.textContent = '🎁';
-                    modeTitle.textContent = 'Distribuição';
-                    indicator.style.borderLeft = '4px solid #10b981';
-                }
-                
-                // Calcula progresso (simplificado)
-                const progress = data.modo === 'arrecadacao' 
-                    ? Math.min(100, (data.total_arrecadado / 50) * 100)  // Meta fixa de R$ 50
-                    : Math.min(100, (data.total_distribuido / 12.5) * 100); // Meta fixa de R$ 12.50
-                
-                modeProgress.textContent = `${progress.toFixed(1)}%`;
-                
-                // Atualiza timestamp
-                lastUpdateTime = new Date();
-                lastUpdate.textContent = 'Agora';
-                
-                // Atualiza status automático
-                autoStatus.textContent = `🔄 AUTO #${autoCounter} (10s)`;
-                
-                console.log('✅ Indicador atualizado com sucesso');
-            } else {
-                console.log('⚠️ Sistema inativo ou erro - não atualizando indicador');
-            }
-        }
-        
-        function updateTimeDisplay() {
-            const lastUpdate = document.getElementById('last-update');
-            if (lastUpdateTime && lastUpdate) {
-                const now = new Date();
-                const diff = Math.floor((now - lastUpdateTime) / 1000); // segundos
-                
-                if (diff < 60) {
-                    lastUpdate.textContent = `${diff}s atrás`;
-                } else if (diff < 3600) {
-                    lastUpdate.textContent = `${Math.floor(diff / 60)}min atrás`;
-                } else {
-                    lastUpdate.textContent = `${Math.floor(diff / 3600)}h atrás`;
-                }
-            }
-        }
-        
-        async function processDistribution() {
-            console.log('🔄 Iniciando processamento automático do sistema de distribuição...');
-            
-            try {
-                const response = await fetch('/api/distribution/process', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-                    }
-                });
-                
-                console.log('📡 Resposta do servidor:', response.status);
-                
-                const data = await response.json();
-                console.log('📊 Dados recebidos:', data);
-                
-                // Atualiza indicador visual
-                updateIndicator(data);
-                
-                if (data.status === 'processed' && data.changed) {
-                    console.log(`🔄 Sistema de Distribuição mudou para: ${data.modo.toUpperCase()}`);
-                }
-                
-                // Log opcional do status
-                if (data.status === 'processed') {
-                    console.log(`💰 Distribuição: ${data.modo} - Arrecadado: R$ ${data.total_arrecadado} - Distribuído: R$ ${data.total_distribuido}`);
-                } else if (data.status === 'inactive') {
-                    console.log('⚠️ Sistema inativo, tentando processamento forçado...');
-                    // Tenta o endpoint forçado
-                    await processDistributionForce();
-                }
-                
-            } catch (error) {
-                console.error('❌ Erro ao processar distribuição:', error);
-                console.log('🔄 Tentando processamento forçado como backup...');
-                await processDistributionForce();
-            }
-        }
+</section>
 
-        async function processDistributionForce() {
-            try {
-                const forceResponse = await fetch('/api/distribution/force');
-                const forceData = await forceResponse.json();
-                console.log('📊 Dados do processamento forçado:', forceData);
-                
-                if (forceData.status === 'forced') {
-                    console.log('✅ Processamento forçado executado!');
-                    updateIndicator(forceData);
-                }
-            } catch (error) {
-                console.error('❌ Erro no processamento forçado:', error);
-            }
-        }
-        
-        // Teste imediato para verificar se o script está funcionando
-        console.log('🔧 Script de distribuição carregado!');
-        console.log('🔧 Timestamp:', new Date().toLocaleTimeString());
-        
-        // Inicia automação quando a página carrega
-        window.addEventListener('load', function() {
-            console.log('🚀 Página carregada, iniciando sistema de distribuição...');
-            console.log('🚀 Timestamp:', new Date().toLocaleTimeString());
-            
-            // Teste imediato
-            console.log('🧪 Teste imediato do sistema...');
-            processDistribution();
-            
-            // Primeira execução após 2 segundos
-            setTimeout(() => {
-                console.log('⏰ Primeira execução do sistema de distribuição...');
-                console.log('⏰ Timestamp:', new Date().toLocaleTimeString());
-                processDistribution();
-                
-                // Executa a cada 30 segundos (30000ms)
-                distributionInterval = setInterval(() => {
-                    autoCounter++;
-                    console.log(`⏰ Execução automática #${autoCounter} do sistema de distribuição...`);
-                    console.log(`⏰ Timestamp: ${new Date().toLocaleTimeString()}`);
-                    
-                    // Atualiza indicador de status
-                    const statusIndicator = document.getElementById('auto-status-indicator');
-                    if (statusIndicator) {
-                        statusIndicator.textContent = `🔄 Executando #${autoCounter}...`;
-                        statusIndicator.style.background = '#10b981';
-                    }
-                    
-                    processDistribution();
-                }, 30000);
-                
-                // Atualiza o tempo a cada segundo
-                timeUpdateInterval = setInterval(updateTimeDisplay, 1000);
-                
-                                    console.log('🤖 Sistema de Distribuição automático iniciado (a cada 30 segundos)');
-            }, 2000);
+<main id="jogos">
+    <div class="section-title"><h2>Jogos em destaque</h2><small>Escolha seu favorito</small></div>
+    <div class="games">
+        @foreach ([
+            ['tigre.webp','Fortune Tiger'], ['rabbit.webp','Fortune Rabbit'], ['mouse.webp','Fortune Mouse'],
+            ['ox.webp','Fortune Ox'], ['ganesha.webp','Ganesha Gold'], ['gates.webp','Gates of Olympus'],
+            ['tree.webp','Árvore da Fortuna'], ['gold.webp','Golden Wins'], ['fruit.png','Fruit Party'],
+            ['sugar.png','Sugar Rush'], ['dog.png','Lucky Dog'], ['big.png','Big Win']
+        ] as [$image, $name])
+            <article class="game" onclick="loginModal.showModal()">
+                <img src="{{ asset('assets/images/games') }}/{{ $image }}" alt="{{ $name }}" loading="lazy">
+                <div><strong>{{ $name }}</strong><small>Clique para jogar</small></div>
+            </article>
+        @endforeach
+    </div>
+</main>
+
+<dialog id="loginModal">
+    <div class="dialog-head"><h3>Entrar</h3><button class="close" onclick="loginModal.close()">×</button></div>
+    <form id="loginForm">
+        <input name="email" type="email" placeholder="Seu e-mail" required>
+        <input name="password" type="password" placeholder="Sua senha" required>
+        <div id="message"></div>
+        <button class="primary" type="submit">Entrar</button>
+    </form>
+</dialog>
+
+<dialog id="registerModal">
+    <div class="dialog-head"><h3>Criar conta</h3><button class="close" onclick="registerModal.close()">×</button></div>
+    <p style="color:#b8bfce;line-height:1.5">O cadastro completo será disponibilizado no próximo ajuste. Se já possui conta, use o botão Entrar.</p>
+    <button class="primary" onclick="registerModal.close();loginModal.showModal()">Já tenho uma conta</button>
+</dialog>
+
+<footer>© {{ date('Y') }} {{ config('app.name', 'Raspadinha') }}. Todos os direitos reservados.</footer>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const message = document.getElementById('message');
+    message.textContent = 'Entrando...';
+    const data = Object.fromEntries(new FormData(event.target));
+    try {
+        const response = await fetch('/auth/login', {
+            method: 'POST', headers: {'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]').content},
+            body: JSON.stringify(data)
         });
-
-                // Também inicia quando o DOM está pronto (backup)
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('📄 DOM carregado, iniciando sistema de distribuição...');
-            console.log('📄 Timestamp:', new Date().toLocaleTimeString());
-            
-                            // Executa a cada 30 segundos
-                if (!distributionInterval) {
-                    distributionInterval = setInterval(() => {
-                        autoCounter++;
-                        console.log(`⏰ Execução automática (DOM) #${autoCounter} do sistema de distribuição...`);
-                        console.log(`⏰ Timestamp: ${new Date().toLocaleTimeString()}`);
-                        
-                        // Atualiza indicador de status
-                        const statusIndicator = document.getElementById('auto-status-indicator');
-                        if (statusIndicator) {
-                            statusIndicator.textContent = `🔄 Executando #${autoCounter}...`;
-                            statusIndicator.style.background = '#10b981';
-                        }
-                        
-                        processDistribution();
-                    }, 30000);
-                }
-        });
-
-        // Sistema de backup adicional - executa sempre
-        setInterval(() => {
-            if (!distributionInterval) {
-                console.log('🔄 Sistema de backup ativado...');
-                autoCounter++;
-                console.log(`⏰ Backup automático #${autoCounter} do sistema de distribuição...`);
-                console.log(`⏰ Timestamp: ${new Date().toLocaleTimeString()}`);
-                
-                // Atualiza indicador de status
-                const statusIndicator = document.getElementById('auto-status-indicator');
-                if (statusIndicator) {
-                    statusIndicator.textContent = `🔄 Backup #${autoCounter}...`;
-                    statusIndicator.style.background = '#f59e0b';
-                }
-                
-                processDistribution();
-            }
-        }, 30000);
-        
-        // Função de teste manual
-        async function testManual() {
-            console.log('🧪 Teste manual iniciado...');
-            
-            // Primeiro testa o endpoint GET
-            try {
-                console.log('🔍 Testando endpoint GET...');
-                const testResponse = await fetch('/api/distribution/test');
-                const testData = await testResponse.json();
-                console.log('📊 Dados do teste GET:', testData);
-                
-                if (testData.status === 'found') {
-                    console.log('✅ Sistema encontrado, ativo:', testData.ativo);
-                    
-                    if (testData.ativo) {
-                        console.log('🔄 Sistema ativo, testando processamento...');
-                        processDistribution();
-                    } else {
-                        console.log('⚠️ Sistema inativo! Ative no Filament primeiro.');
-                    }
-                } else {
-                    console.log('❌ Sistema não encontrado');
-                }
-            } catch (error) {
-                console.error('❌ Erro no teste GET:', error);
-            }
-        }
-
-        // Função de teste forçado
-        async function testForce() {
-            console.log('🔥 Teste forçado iniciado...');
-            
-            try {
-                console.log('🔍 Testando endpoint FORCE...');
-                const forceResponse = await fetch('/api/distribution/force');
-                const forceData = await forceResponse.json();
-                console.log('📊 Dados do teste FORCE:', forceData);
-                
-                if (forceData.status === 'forced') {
-                    console.log('✅ Processamento forçado executado!');
-                    console.log('- Modo:', forceData.modo);
-                    console.log('- Arrecadado:', forceData.total_arrecadado);
-                    console.log('- Distribuído:', forceData.total_distribuido);
-                    console.log('- Mudou:', forceData.changed);
-                    
-                    // Atualiza indicador visual
-                    updateIndicator(forceData);
-                } else {
-                    console.log('❌ Erro no processamento forçado');
-                }
-            } catch (error) {
-                console.error('❌ Erro no teste FORCE:', error);
-            }
-        }
-
-        // Cleanup quando a página for fechada
-        window.addEventListener('beforeunload', function() {
-            if (distributionInterval) {
-                clearInterval(distributionInterval);
-            }
-            if (timeUpdateInterval) {
-                clearInterval(timeUpdateInterval);
-            }
-        });
-    </script>
-    
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'E-mail ou senha inválidos.');
+        window.location.reload();
+    } catch (error) { message.textContent = error.message; }
+});
+</script>
 </body>
 </html>
