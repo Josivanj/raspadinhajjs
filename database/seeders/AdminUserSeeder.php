@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Models\Role;
 
@@ -29,38 +30,55 @@ class AdminUserSeeder extends Seeder
         ]);
 
         $user = User::firstOrNew(['email' => $email]);
-        $attributes = [
-            'name' => 'Admin',
+        $attributes = ['name' => 'Admin'];
+
+        foreach ([
             'role_id' => 0,
             'status' => 'active',
             'banned' => 0,
             'email_verified_at' => now(),
-        ];
+        ] as $column => $value) {
+            if (Schema::hasColumn('users', $column)) {
+                $attributes[$column] = $value;
+            }
+        }
 
         if (! $user->exists || ! Hash::check($password, (string) $user->password)) {
             $attributes['password'] = $password;
         }
 
-        $user->forceFill($attributes)->save();
+        User::withoutEvents(fn () => $user->forceFill($attributes)->save());
 
         if (! $user->hasRole('admin')) {
             $user->assignRole($adminRole);
         }
 
-        $hasActiveWallet = DB::table('wallets')
-            ->where('user_id', $user->id)
-            ->where('active', 1)
+        if (! Schema::hasTable('wallets') || ! Schema::hasColumn('wallets', 'user_id')) {
+            return;
+        }
+
+        $walletQuery = DB::table('wallets')->where('user_id', $user->id);
+        if (Schema::hasColumn('wallets', 'active')) {
+            $walletQuery->where('active', 1);
+        }
+
+        $hasActiveWallet = $walletQuery
             ->exists();
 
         if (! $hasActiveWallet) {
-            DB::table('wallets')->insert([
-                'user_id' => $user->id,
+            $wallet = ['user_id' => $user->id];
+            foreach ([
                 'currency' => 'BRL',
                 'symbol' => 'R$',
                 'active' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ] as $column => $value) {
+                if (Schema::hasColumn('wallets', $column)) {
+                    $wallet[$column] = $value;
+                }
+            }
+            DB::table('wallets')->insert($wallet);
         }
     }
 }
