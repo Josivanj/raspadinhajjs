@@ -23,7 +23,7 @@
     </div>
 
     <!-- Botão de Teste Manual (apenas para debug) -->
-    <div id="test-button" style="position: fixed; top: 80px; right: 20px; z-index: 9999;">
+    <div id="test-button" style="display: none; position: fixed; top: 80px; right: 20px; z-index: 9999;">
         <button onclick="testManual()" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;">
             🧪 Teste Manual
         </button>
