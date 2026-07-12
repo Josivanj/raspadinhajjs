@@ -231,6 +231,8 @@ Route::post('/distribution/process', function() {
 });
 
 // Endpoint de teste sem autenticação
+Route::post('/distribution/process', [DistributionController::class, 'process']);
+
 Route::get('/distribution/test', function() {
     $distribution = DistributionSystem::first();
     

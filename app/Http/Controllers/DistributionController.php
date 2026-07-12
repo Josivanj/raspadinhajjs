@@ -8,10 +8,85 @@ use App\Models\GamesKey;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class DistributionController extends Controller
 {
     private string $secretKey = '2@jkd)CKp';
+
+    public function process()
+    {
+        try {
+            return DB::transaction(function () {
+                $distribution = DistributionSystem::query()->lockForUpdate()->first();
+
+                if (!$distribution) {
+                    return response()->json(['status' => 'not_found', 'message' => 'Sistema não configurado'], 404);
+                }
+
+                if (!$distribution->ativo) {
+                    return response()->json(['status' => 'inactive', 'message' => 'Sistema está inativo']);
+                }
+
+                if (!$distribution->start_cycle_at) {
+                    $distribution->start_cycle_at = now();
+                }
+
+                $changed = false;
+
+                if ($distribution->modo === 'arrecadacao') {
+                    $total = (float) Order::query()->where('type', 'bet')
+                        ->where('created_at', '>=', $distribution->start_cycle_at)->sum('amount');
+                    $distribution->total_arrecadado = $total;
+
+                    if ($total >= (float) $distribution->meta_arrecadacao) {
+                        $distribution->total_arrecadado = 0;
+                        $distribution->modo = 'distribuicao';
+                        $distribution->start_cycle_at = now();
+                        $changed = true;
+                    }
+                } elseif ($distribution->modo === 'distribuicao') {
+                    $total = (float) Order::query()->where('type', 'win')
+                        ->where('created_at', '>=', $distribution->start_cycle_at)->sum('amount');
+                    $distribution->total_distribuido = $total;
+                    $target = (float) $distribution->meta_arrecadacao
+                        * ((float) $distribution->percentual_distribuicao / 100);
+
+                    if ($total >= $target) {
+                        $distribution->total_distribuido = 0;
+                        $distribution->modo = 'arrecadacao';
+                        $distribution->start_cycle_at = now();
+                        $changed = true;
+                    }
+                }
+
+                $distribution->save();
+
+                if ($changed) {
+                    $this->updateRTP($distribution->modo === 'distribuicao'
+                        ? $distribution->rtp_distribuicao : $distribution->rtp_arrecadacao);
+                }
+
+                return response()->json([
+                    'status' => 'processed',
+                    'modo' => $distribution->modo,
+                    'changed' => $changed,
+                    'total_arrecadado' => $distribution->total_arrecadado,
+                    'total_distribuido' => $distribution->total_distribuido,
+                ]);
+            }, 3);
+        } catch (Throwable $exception) {
+            Log::error('Falha ao processar sistema de distribuição', [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+            ]);
+
+            throw $exception;
+        }
+    }
 
     public function checkDistributionSystem(Request $request)
     {
@@ -185,8 +260,13 @@ class DistributionController extends Controller
                     'rtp'          => $rtp,
                     'bonus_enable' => true,
                 ]);
-        } catch (\Exception $e) {
-            Log::error('Erro ao atualizar RTP: ' . $e->getMessage());
+        } catch (Throwable $exception) {
+            Log::error('Falha ao atualizar RTP do provedor', [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+            ]);
         }
     }
 }
