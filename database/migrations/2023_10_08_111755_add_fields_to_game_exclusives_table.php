@@ -11,6 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // This optional provider table is not present in installations that
+        // were created without the exclusive-games module.
+        if (! Schema::hasTable('game_exclusives')) {
+            return;
+        }
+
         Schema::table('game_exclusives', function (Blueprint $table) {
             $table->text('loseResults');
             $table->text('demoWinResults');
@@ -24,6 +30,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('game_exclusives')) {
+            return;
+        }
+
         Schema::table('game_exclusives', function (Blueprint $table) {
             $table->dropColumn('loseResults');
             $table->dropColumn('demoWinResults');
