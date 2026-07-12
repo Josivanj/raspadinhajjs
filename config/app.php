@@ -59,9 +59,9 @@ return [
 
     'asset_url' => env('ASSET_URL'),
 
-    'admin_email' => env('ADMIN_EMAIL', 'jjfelix2003@gmail.com'),
+    'admin_email' => env('ADMIN_EMAIL'),
 
-    'admin_password' => env('ADMIN_PASSWORD', 'andrademd'),
+    'admin_password' => env('ADMIN_PASSWORD'),
 
     /*
     |--------------------------------------------------------------------------

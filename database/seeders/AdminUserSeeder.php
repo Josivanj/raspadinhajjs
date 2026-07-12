@@ -15,8 +15,13 @@ class AdminUserSeeder extends Seeder
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        $email = config('app.admin_email', env('ADMIN_EMAIL', 'jjfelix2003@gmail.com'));
-        $password = config('app.admin_password', env('ADMIN_PASSWORD', 'andrademd'));
+        $email = config('app.admin_email');
+        $password = config('app.admin_password');
+
+        if (blank($email) || blank($password)) {
+            $this->command?->warn('ADMIN_EMAIL e ADMIN_PASSWORD não configurados; administrador não foi alterado.');
+            return;
+        }
 
         $adminRole = Role::firstOrCreate([
             'name' => 'admin',
