@@ -15,6 +15,10 @@ use App\Models\DistributionSystem;
 use App\Models\Order;
 use App\Models\GamesKey;
 use Illuminate\Support\Facades\Http;
+use App\Http\Controllers\Api\Auth\AuthController as ApiAuthController;
+use App\Http\Controllers\Api\RaspadinhaController;
+use App\Http\Controllers\Api\Profile\ProfileController as ApiProfileController;
+use App\Http\Controllers\Api\Profile\WalletController as ApiWalletController;
 
 /*
 |--------------------------------------------------------------------------
@@ -175,11 +179,26 @@ Route::get('/raspadinhas', function () {
     return Inertia::render('Raspadinhas/RaspadinhasPage');
 })->name('raspadinhas');
 
-// Railway fallback: keep API endpoints registered before the SPA catch-all.
-// Some cached production builds were resolving /api/* as frontend GET routes.
-Route::prefix('api')
-    ->middleware('api')
-    ->group(base_path('routes/api.php'));
+// Essential API routes are declared here as a production-safe fallback.
+// They must stay above the SPA catch-all route.
+Route::prefix('api')->middleware('api')->group(function () {
+    Route::post('/auth/login', [ApiAuthController::class, 'login']);
+    Route::post('/auth/register', [ApiAuthController::class, 'register']);
+    Route::get('/raspadinhas', [RaspadinhaController::class, 'index']);
+
+    Route::middleware('auth.jwt')->group(function () {
+        Route::get('/profile/wallet', [ApiWalletController::class, 'index']);
+        Route::post('/profile/raspadinha', [ApiProfileController::class, 'playScratchCard']);
+        Route::post('/profile/raspadinha-cinco', [ApiProfileController::class, 'playScratchCardCincoMil']);
+        Route::post('/profile/raspadinha-dez', [ApiProfileController::class, 'playScratchCardDezMil']);
+        Route::post('/profile/raspadinha-milhao', [ApiProfileController::class, 'playScratchCardMilhao']);
+        Route::post('/profile/raspadinha-make', [ApiProfileController::class, 'playScratchCardMake']);
+        Route::post('/profile/raspadinha-6', [ApiProfileController::class, 'playScratchCard6']);
+        Route::post('/profile/raspadinha-7', [ApiProfileController::class, 'playScratchCard7']);
+        Route::post('/profile/raspadinha-8', [ApiProfileController::class, 'playScratchCard8']);
+        Route::post('/profile/raspadinha-9', [ApiProfileController::class, 'playScratchCard9']);
+    });
+});
 
 Route::get('/{any}', function () {
     return view('spa');
