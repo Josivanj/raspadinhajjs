@@ -175,6 +175,12 @@ Route::get('/raspadinhas', function () {
     return Inertia::render('Raspadinhas/RaspadinhasPage');
 })->name('raspadinhas');
 
+// Railway fallback: keep API endpoints registered before the SPA catch-all.
+// Some cached production builds were resolving /api/* as frontend GET routes.
+Route::prefix('api')
+    ->middleware('api')
+    ->group(base_path('routes/api.php'));
+
 Route::get('/{any}', function () {
     return view('spa');
 })->where('any', '.*');
