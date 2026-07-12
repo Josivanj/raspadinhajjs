@@ -33,6 +33,21 @@
         .game div { padding:14px; }
         .game strong { display:block; margin-bottom:5px; }
         .game small { color:var(--muted); }
+        .scratch-section { padding:42px max(20px,5vw) 8px; }
+        .scratch-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:18px; }
+        .scratch-card { overflow:hidden; border:1px solid #343b4b; border-radius:18px; background:linear-gradient(145deg,#1e2430,#11151e); }
+        .scratch-card img { width:100%; height:175px; display:block; object-fit:cover; background:linear-gradient(135deg,#f4b942,#7d4d00); }
+        .scratch-card-body { padding:17px; }
+        .scratch-card h3 { margin:0 0 7px; }
+        .scratch-meta { display:flex; justify-content:space-between; margin:14px 0; color:var(--gold); font-weight:800; }
+        .scratch-card button { width:100%; background:var(--green); color:#07130f; }
+        .account { display:none; align-items:center; gap:10px; }
+        .balance { color:var(--gold); font-weight:900; }
+        .scratch-board { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin:18px 0; }
+        .scratch-item { min-height:92px; display:grid; place-items:center; padding:8px; text-align:center; border:2px dashed #5b6477; border-radius:12px; background:#252b38; cursor:pointer; }
+        .scratch-item.revealed { border-style:solid; border-color:var(--gold); background:#10141c; }
+        .scratch-item img { width:55px; height:55px; object-fit:contain; }
+        .empty-state { grid-column:1/-1; color:var(--muted); padding:25px; text-align:center; border:1px dashed #343b4b; border-radius:14px; }
         footer { padding:25px; text-align:center; color:#737b8d; border-top:1px solid #20242f; }
         dialog { width:min(92vw,420px); color:#fff; border:1px solid #343b4b; border-radius:18px; background:#151923; }
         dialog::backdrop { background:rgba(0,0,0,.75); }
@@ -50,8 +65,9 @@
     <div class="brand"><span>★</span>{{ config('app.name', 'Raspadinha') }}</div>
     <nav>
         <a class="button" href="#jogos">Jogos</a>
-        <button onclick="loginModal.showModal()">Entrar</button>
-        <button class="primary" onclick="registerModal.showModal()">Criar conta</button>
+        <button class="guest-action" onclick="loginModal.showModal()">Entrar</button>
+        <button class="primary guest-action" onclick="registerModal.showModal()">Criar conta</button>
+        <div class="account" id="account"><span class="balance" id="balance">R$ 0,00</span><button onclick="logout()">Sair</button></div>
     </nav>
 </header>
 
@@ -64,6 +80,11 @@
             <a class="button" href="#jogos">Ver jogos</a>
         </div>
     </div>
+</section>
+
+<section class="scratch-section" id="raspadinhas">
+    <div class="section-title"><h2>Raspadinhas</h2><small>Raspe e descubra seu prêmio</small></div>
+    <div class="scratch-grid" id="scratchGrid"><div class="empty-state">Carregando raspadinhas...</div></div>
 </section>
 
 <main id="jogos">
@@ -91,6 +112,13 @@
         <div id="message"></div>
         <button class="primary" type="submit">Entrar</button>
     </form>
+</dialog>
+
+<dialog id="scratchModal">
+    <div class="dialog-head"><h3 id="scratchTitle">Raspadinha</h3><button class="close" onclick="scratchModal.close()">×</button></div>
+    <p id="scratchStatus">Confirme para jogar.</p>
+    <div class="scratch-board" id="scratchBoard"></div>
+    <button class="primary" id="scratchPlayButton" onclick="playSelectedScratch()">Jogar agora</button>
 </dialog>
 
 <dialog id="registerModal">
@@ -122,6 +150,83 @@ const requireLogin = () => {
     document.getElementById('jogos').scrollIntoView({behavior: 'smooth'});
 };
 
+const money = value => Number(value || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+let selectedScratch = null;
+const scratchRoutes = [
+    {max:1.99, route:'raspadinha'}, {max:2.99, route:'raspadinha-cinco'},
+    {max:5.99, route:'raspadinha-dez'}, {max:25.99, route:'raspadinha-milhao'},
+    {max:50.99, route:'raspadinha-make'}, {max:60.99, route:'raspadinha-6'},
+    {max:80.99, route:'raspadinha-7'}, {max:100.99, route:'raspadinha-8'},
+    {max:Infinity, route:'raspadinha-9'}
+];
+
+function syncAuth(user = null) {
+    const logged = !!localStorage.getItem('auth_token');
+    document.querySelectorAll('.guest-action').forEach(el => el.style.display = logged ? 'none' : 'inline-block');
+    document.getElementById('account').style.display = logged ? 'flex' : 'none';
+    if (logged) loadWallet();
+}
+
+async function loadWallet() {
+    try {
+        const result = await api('/api/profile/wallet');
+        const wallet = result.wallet || result.data || result;
+        const total = Number(wallet.balance || 0) + Number(wallet.balance_withdrawal || 0) + Number(wallet.balance_bonus || 0);
+        document.getElementById('balance').textContent = money(total);
+    } catch (error) {
+        if (/token|unauth/i.test(error.message)) logout(false);
+    }
+}
+
+async function logout(callApi = true) {
+    if (callApi) await api('/api/auth/logout', {method:'POST'}).catch(() => {});
+    localStorage.removeItem('auth_token');
+    syncAuth();
+}
+
+function openScratch(card) {
+    if (!localStorage.getItem('auth_token')) return loginModal.showModal();
+    selectedScratch = card;
+    document.getElementById('scratchTitle').textContent = card.name;
+    document.getElementById('scratchStatus').textContent = `Valor da jogada: ${money(card.price)}. Prêmio máximo: ${money(card.max_prize)}.`;
+    document.getElementById('scratchBoard').innerHTML = Array.from({length:9}, () => '<div class="scratch-item">?</div>').join('');
+    document.getElementById('scratchPlayButton').disabled = false;
+    scratchModal.showModal();
+}
+
+async function playSelectedScratch() {
+    if (!selectedScratch) return;
+    const button = document.getElementById('scratchPlayButton');
+    const status = document.getElementById('scratchStatus');
+    button.disabled = true;
+    status.textContent = 'Processando sua raspadinha...';
+    try {
+        const route = scratchRoutes.find(item => Number(selectedScratch.price) <= item.max).route;
+        const result = await api(`/api/profile/${route}`, {method:'POST'});
+        document.getElementById('scratchBoard').innerHTML = result.items.map(item => `
+            <div class="scratch-item revealed">${item.image ? `<img src="${item.image}" alt="">` : ''}<strong>${item.name}</strong></div>`).join('');
+        status.textContent = result.win ? `Parabéns! Você ganhou ${result.winningItemName || money(result.value)}.` : 'Não foi desta vez. Tente novamente!';
+        await loadWallet();
+    } catch (error) {
+        status.textContent = error.message;
+        button.disabled = false;
+    }
+}
+
+async function loadScratchCards() {
+    const grid = document.getElementById('scratchGrid');
+    try {
+        const result = await api('/api/raspadinhas');
+        const cards = result.data || [];
+        if (!cards.length) throw new Error('Nenhuma raspadinha ativa no momento.');
+        grid.innerHTML = cards.map((card, index) => `<article class="scratch-card">
+            <img src="${card.image ? (card.image.startsWith('http') ? card.image : '/storage/' + card.image.replace(/^\//,'')) : '/assets/images/FortuneTiger.webp'}" alt="${card.name}" loading="lazy">
+            <div class="scratch-card-body"><h3>${card.name}</h3><small>${card.description || 'Raspe e concorra a prêmios.'}</small>
+            <div class="scratch-meta"><span>${money(card.price)}</span><span>Até ${money(card.max_prize)}</span></div>
+            <button onclick='openScratch(${JSON.stringify(card).replaceAll("'", "&#39;")})'>Raspar agora</button></div></article>`).join('');
+    } catch (error) { grid.innerHTML = `<div class="empty-state">${error.message}</div>`; }
+}
+
 document.getElementById('loginForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const message = document.getElementById('message');
@@ -130,6 +235,7 @@ document.getElementById('loginForm').addEventListener('submit', async (event) =>
     try {
         const result = await api('/api/auth/login', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
         localStorage.setItem('auth_token', result.access_token);
+        syncAuth(result.user);
         message.style.color = '#12c985';
         message.textContent = 'Login realizado! Escolha um jogo.';
         setTimeout(() => loginModal.close(), 700);
@@ -142,9 +248,9 @@ document.getElementById('registerForm').addEventListener('submit', async (event)
     message.textContent = 'Criando conta...';
     try {
         const data = Object.fromEntries(new FormData(event.target));
-        await api('/api/auth/register', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
-        const login = await api('/api/auth/login', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email:data.email,password:data.password})});
-        localStorage.setItem('auth_token', login.access_token);
+        const registration = await api('/api/auth/register', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)});
+        localStorage.setItem('auth_token', registration.access_token);
+        syncAuth(registration.user);
         message.style.color = '#12c985';
         message.textContent = 'Conta criada com sucesso!';
         setTimeout(() => registerModal.close(), 900);
@@ -174,6 +280,8 @@ async function loadGames() {
 }
 
 loadGames();
+loadScratchCards();
+syncAuth();
 </script>
 </body>
 </html>
