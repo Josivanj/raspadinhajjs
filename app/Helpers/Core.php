@@ -1088,6 +1088,10 @@ private static function PayWin($user, $affiliate, $type, $amount, $changeBonus)
               	'bspay_is_enable',
                 'disable_spin',
                 'disable_rollover',
+                'revshare_percentage',
+                'cpa_value',
+                'cpa_baseline',
+                'rollover',
             )->first();
 
         

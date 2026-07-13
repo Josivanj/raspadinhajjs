@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": { "builder": "RAILPACK" },
   "deploy": {
-    "preDeployCommand": "php artisan optimize:clear && php artisan migrate --path=database/migrations/2024_07_01_004317_add_software_logo_black2_to_settings_table.php --force && php artisan migrate --path=database/migrations/2026_07_12_000000_create_distribution_systems_table.php --force && php artisan migrate --path=database/migrations/2026_07_12_000001_repair_permission_tables.php --force && php artisan migrate --path=database/migrations/2026_07_12_000002_create_raspadinhas_if_missing.php --force && php artisan migrate --path=database/migrations/2026_07_12_000003_repair_settings_columns.php --force && php artisan db:seed --class=AdminUserSeeder --force",
+    "preDeployCommand": "php artisan optimize:clear && php artisan migrate --path=database/migrations/2024_07_01_004317_add_software_logo_black2_to_settings_table.php --force && php artisan migrate --path=database/migrations/2026_07_12_000000_create_distribution_systems_table.php --force && php artisan migrate --path=database/migrations/2026_07_12_000001_repair_permission_tables.php --force && php artisan migrate --path=database/migrations/2026_07_12_000002_create_raspadinhas_if_missing.php --force && php artisan migrate --path=database/migrations/2026_07_12_000003_repair_settings_columns.php --force && php artisan migrate --path=database/migrations/2026_07_12_000004_repair_core_application_schema.php --force && php artisan db:seed --class=AdminUserSeeder --force",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
