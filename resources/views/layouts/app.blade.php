@@ -182,7 +182,8 @@
             {!! $custom['custom_header'] !!}
         @endif
 
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        {{-- Vite build is not available locally in this copy; the page uses inline/local assets instead. --}}
+        {{-- @vite(['resources/css/app.css', 'resources/js/app.js']) --}}
       <script type="text/javascript">
   function googleTranslateElementInit() {
     new google.translate.TranslateElement({
